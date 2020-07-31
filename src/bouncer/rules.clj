@@ -1,6 +1,5 @@
 (ns bouncer.rules
-  (:require [bouncer.core :as core]
-            [bouncer.ip :as ip]
+  (:require [bouncer.ip]
             [clojure.walk :refer [postwalk]]
             [datascript.core :as ds]))
 
@@ -65,7 +64,8 @@
   (let [replacements
         {'thus 'bouncer.rules/thus
          'later? 'bouncer.rules/later?
-         'trace 'bouncer.rules/trace}]
+         'trace 'bouncer.rules/trace
+         'ip/ranges 'bouncer.ip/ranges}]
     (postwalk #(get replacements % %) (apply concat rules))))
 
 ;; Пример правил с явными запретами авторизационных контекстов.
