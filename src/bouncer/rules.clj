@@ -12,6 +12,11 @@
 ;; Авторизация считается одобренной, если после применения правил нет ни одного
 ;; явного запрета и хотя бы одно явное разрешение.
 
+;; Правила пишутся в виде DSL на [EDN](https://github.com/edn-format/edn).
+;; Язык правил практически полностью по семантике аналогичен Datomic.
+;; 
+;; https://docs.datomic.com/on-prem/query.html
+;; https://github.com/tonsky/datascript#differences-from-datomic
 (defn forbidden?
   "Given datascript DB with some set (usually just one) of auth contexts
    tells which of them are explicitly forbidden and why."
@@ -64,7 +69,8 @@
     (postwalk #(get replacements % %) (apply concat rules))))
 
 ;; Пример правил с явными запретами авторизационных контекстов.
-
+;;
+;; https://docs.datomic.com/on-prem/query.html#rules
 (def ^:private -rules-forbidden
   (prepare
    ;; Каждое правило начинается со списка из символа `forbidden` и биндингов
