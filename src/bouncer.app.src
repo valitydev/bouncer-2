@@ -1,0 +1,20 @@
+{application, bouncer, [
+    {description, "Does someone look like a troublemaker?"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {bouncer, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        genlib,
+        woody,
+        scoper,
+        thrift,
+        gun,
+        jesse,
+        bouncer_proto,
+        erl_health
+    ]},
+    {env, []},
+    {licenses, ["Apache 2.0"]}
+]}.
