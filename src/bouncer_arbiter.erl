@@ -84,11 +84,15 @@ get_judgement_schema() ->
             {<<"type">>, <<"object">>},
             {<<"required">>, [<<"code">>]},
             {<<"properties">>, [
-                {<<"code">>, [{<<"type">>, <<"string">>}, {<<"minLength">>, 1}]}
+                {<<"code">>, [
+                    {<<"type">>, <<"string">>},
+                    {<<"minLength">>, 1}
+                ]}
             ]}
         ]}
     ],
     [
+        {<<"$schema">>, <<"http://json-schema.org/draft-04/schema#">>},
         {<<"type">>, <<"object">>},
         {<<"properties">>, [
             {<<"allowed">>, AssertionsSchema},
