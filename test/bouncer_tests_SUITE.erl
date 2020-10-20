@@ -143,8 +143,8 @@ end_per_group(_Name, C) ->
     stop_bouncer(C).
 
 stop_bouncer(C) ->
-    with_config(stash, C, fun (Pid) -> ?assertEqual(ok, ct_stash:destroy(Pid)) end),
-    with_config(group_apps, C, fun (Apps) -> genlib_app:stop_unload_applications(Apps) end).
+    with_config(group_apps, C, fun (Apps) -> genlib_app:stop_unload_applications(Apps) end),
+    with_config(stash, C, fun (Pid) -> ?assertEqual(ok, ct_stash:destroy(Pid)) end).
 
 -spec init_per_testcase(atom(), config()) ->
     config().
