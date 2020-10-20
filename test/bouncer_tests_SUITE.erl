@@ -13,7 +13,9 @@
 -export([end_per_testcase/2]).
 
 -export([missing_ruleset_notfound/1]).
--export([incorrect_ruleset_invalid/1]).
+-export([incorrect_ruleset_invalid_1/1]).
+-export([incorrect_ruleset_invalid_2/1]).
+-export([incorrect_ruleset_invalid_3/1]).
 -export([missing_content_invalid_context/1]).
 -export([junk_content_invalid_context/1]).
 -export([conflicting_context_invalid/1]).
@@ -61,7 +63,9 @@ groups() ->
     [
         {general, [parallel], [
             missing_ruleset_notfound,
-            incorrect_ruleset_invalid,
+            incorrect_ruleset_invalid_1,
+            incorrect_ruleset_invalid_2,
+            incorrect_ruleset_invalid_3,
             missing_content_invalid_context,
             junk_content_invalid_context,
             conflicting_context_invalid,
@@ -164,7 +168,9 @@ end_per_testcase(_Name, _C) ->
 -define(JUDGEMENT(Resolution), #bdcs_Judgement{resolution = Resolution}).
 
 -spec missing_ruleset_notfound(config()) -> ok.
--spec incorrect_ruleset_invalid(config()) -> ok.
+-spec incorrect_ruleset_invalid_1(config()) -> ok.
+-spec incorrect_ruleset_invalid_2(config()) -> ok.
+-spec incorrect_ruleset_invalid_3(config()) -> ok.
 -spec missing_content_invalid_context(config()) -> ok.
 -spec junk_content_invalid_context(config()) -> ok.
 -spec conflicting_context_invalid(config()) -> ok.
@@ -182,28 +188,43 @@ missing_ruleset_notfound(C) ->
         lists:last(flush_beats(Client, C))
     ).
 
-incorrect_ruleset_invalid(C) ->
-    Client1 = mk_client(C),
+incorrect_ruleset_invalid_1(C) ->
+    Client = mk_client(C),
     ?assertThrow(
         #bdcs_InvalidRuleset{},
-        call_judge("trivial/incorrect1", ?CONTEXT(#{}), Client1)
+        call_judge("trivial/incorrect1", ?CONTEXT(#{}), Client)
     ),
     ?assertMatch(
         {judgement, {failed, {ruleset_invalid, [
             {data_invalid, _, no_extra_properties_allowed, _, [<<"fordibben">>]}
         ]}}},
-        lists:last(flush_beats(Client1, C))
-    ),
-    Client2 = mk_client(C),
+        lists:last(flush_beats(Client, C))
+    ).
+
+incorrect_ruleset_invalid_2(C) ->
+    Client = mk_client(C),
     ?assertThrow(
         #bdcs_InvalidRuleset{},
-        call_judge("trivial/incorrect2", ?CONTEXT(#{}), Client2)
+        call_judge("trivial/incorrect2", ?CONTEXT(#{}), Client)
     ),
     ?assertMatch(
         {judgement, {failed, {ruleset_invalid, [
             {data_invalid, _, wrong_type, _, [<<"allowed">>]}
         ]}}},
-        lists:last(flush_beats(Client2, C))
+        lists:last(flush_beats(Client, C))
+    ).
+
+incorrect_ruleset_invalid_3(C) ->
+    Client = mk_client(C),
+    ?assertThrow(
+        #bdcs_InvalidRuleset{},
+        call_judge("trivial/incorrect3", ?CONTEXT(#{}), Client)
+    ),
+    ?assertMatch(
+        {judgement, {failed, {ruleset_invalid, [
+            {data_invalid, _, missing_required_property, <<"code">>, _}
+        ]}}},
+        lists:last(flush_beats(Client, C))
     ).
 
 missing_content_invalid_context(C) ->
