@@ -13,9 +13,9 @@
 -export([end_per_testcase/2]).
 
 -export([missing_ruleset_notfound/1]).
--export([incorrect_ruleset_invalid_1/1]).
--export([incorrect_ruleset_invalid_2/1]).
--export([incorrect_ruleset_invalid_3/1]).
+-export([incorrect_ruleset_invalid1/1]).
+-export([incorrect_ruleset_invalid2/1]).
+-export([incorrect_ruleset_invalid3/1]).
 -export([missing_content_invalid_context/1]).
 -export([junk_content_invalid_context/1]).
 -export([conflicting_context_invalid/1]).
@@ -63,9 +63,9 @@ groups() ->
     [
         {general, [parallel], [
             missing_ruleset_notfound,
-            incorrect_ruleset_invalid_1,
-            incorrect_ruleset_invalid_2,
-            incorrect_ruleset_invalid_3,
+            incorrect_ruleset_invalid1,
+            incorrect_ruleset_invalid2,
+            incorrect_ruleset_invalid3,
             missing_content_invalid_context,
             junk_content_invalid_context,
             conflicting_context_invalid,
@@ -168,9 +168,9 @@ end_per_testcase(_Name, _C) ->
 -define(JUDGEMENT(Resolution), #bdcs_Judgement{resolution = Resolution}).
 
 -spec missing_ruleset_notfound(config()) -> ok.
--spec incorrect_ruleset_invalid_1(config()) -> ok.
--spec incorrect_ruleset_invalid_2(config()) -> ok.
--spec incorrect_ruleset_invalid_3(config()) -> ok.
+-spec incorrect_ruleset_invalid1(config()) -> ok.
+-spec incorrect_ruleset_invalid2(config()) -> ok.
+-spec incorrect_ruleset_invalid3(config()) -> ok.
 -spec missing_content_invalid_context(config()) -> ok.
 -spec junk_content_invalid_context(config()) -> ok.
 -spec conflicting_context_invalid(config()) -> ok.
@@ -188,7 +188,7 @@ missing_ruleset_notfound(C) ->
         lists:last(flush_beats(Client, C))
     ).
 
-incorrect_ruleset_invalid_1(C) ->
+incorrect_ruleset_invalid1(C) ->
     Client = mk_client(C),
     ?assertThrow(
         #bdcs_InvalidRuleset{},
@@ -201,7 +201,7 @@ incorrect_ruleset_invalid_1(C) ->
         lists:last(flush_beats(Client, C))
     ).
 
-incorrect_ruleset_invalid_2(C) ->
+incorrect_ruleset_invalid2(C) ->
     Client = mk_client(C),
     ?assertThrow(
         #bdcs_InvalidRuleset{},
@@ -214,7 +214,7 @@ incorrect_ruleset_invalid_2(C) ->
         lists:last(flush_beats(Client, C))
     ).
 
-incorrect_ruleset_invalid_3(C) ->
+incorrect_ruleset_invalid3(C) ->
     Client = mk_client(C),
     ?assertThrow(
         #bdcs_InvalidRuleset{},
