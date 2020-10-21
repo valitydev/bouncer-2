@@ -8,15 +8,15 @@
 %% This must be a path to some document with the subdocument of the following form:
 %% ```
 %% "assertions": {
-%%   "allowed": [["code", "description"], ...] // 0 or more, may be unset
-%%   "forbidden": [["code", "description"], ...] // 0 or more, may be unset
+%%   "allowed": [{"code": "...", ...}, ...] // 0 or more, may be unset
+%%   "forbidden": [{"code": "...", ...}, ...] // 0 or more, may be unset
 %% }
 %% ```
 -type ruleset_id() :: iodata().
 
 -type judgement()  :: {resolution(), [assertion()]}.
 -type resolution() :: allowed | forbidden.
--type assertion()  :: {_Code :: binary(), _Description :: binary() | undefined}.
+-type assertion()  :: {_Code :: binary(), _Details :: #{binary() => _}}.
 
 -export_type([judgement/0]).
 -export_type([resolution/0]).
@@ -70,30 +70,29 @@ infer_judgement(_Forbidden = [], _Allowed = []) ->
 extract_assertions(Assertions) ->
     [extract_assertion(E) || E <- Assertions].
 
-extract_assertion([Code, Description]) ->
-    {Code, Description};
-extract_assertion(Code) when is_binary(Code) ->
-    {Code, undefined}.
+extract_assertion(Assertion = #{<<"code">> := Code}) ->
+    {Code, maps:without([<<"code">>], Assertion)}.
 
 -spec get_judgement_schema() ->
     jesse:schema().
 get_judgement_schema() ->
     % TODO
     % Worth declaring in a separate file? Should be helpful w/ CI-like activities.
-    CodeSchema = [{<<"type">>, <<"string">>}, {<<"minLength">>, 1}],
     AssertionsSchema = [
         {<<"type">>, <<"array">>},
-        {<<"items">>, [{<<"oneOf">>, [
-            CodeSchema,
-            [
-                {<<"type">>, <<"array">>},
-                {<<"items">>, CodeSchema},
-                {<<"minItems">>, 1},
-                {<<"maxItems">>, 2}
-            ]
-        ]}]}
+        {<<"items">>, [
+            {<<"type">>, <<"object">>},
+            {<<"required">>, [<<"code">>]},
+            {<<"properties">>, [
+                {<<"code">>, [
+                    {<<"type">>, <<"string">>},
+                    {<<"minLength">>, 1}
+                ]}
+            ]}
+        ]}
     ],
     [
+        {<<"$schema">>, <<"http://json-schema.org/draft-04/schema#">>},
         {<<"type">>, <<"object">>},
         {<<"properties">>, [
             {<<"allowed">>, AssertionsSchema},
