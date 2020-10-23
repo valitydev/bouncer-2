@@ -23,6 +23,9 @@ start(_StartType, _StartArgs) ->
 -spec prep_stop(State) ->
     State.
 prep_stop(State) ->
+    % NOTE
+    % We have to do it in this magic `prep_stop/1` here because for some inexplicable reason the
+    % usual `stop/1` callback doesn't get called in common_test runs.
     ok = bouncer_audit_log:stop(),
     State.
 
