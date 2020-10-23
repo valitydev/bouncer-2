@@ -27,21 +27,24 @@
 %%
 
 -type handler() :: {module(), _Opts}.
+-type handlers() :: [handler()].
 -export_type([handler/0]).
+-export_type([handlers/0]).
 
 -callback handle_beat(beat(), metadata(), _Opts) ->
     ok.
 
 -export([handle_beat/3]).
 
--spec handle_beat(beat(), metadata(), handler() | undefined) ->
+-spec handle_beat(beat(), metadata(), handlers()) ->
     ok.
-handle_beat(Beat, Metadata, {Mod, Opts}) ->
+handle_beat(Beat, Metadata, [{Mod, Opts} | Rest]) ->
     % NOTE
     % Generally, we don't want some fault to propagate from event handler to the business logic
     % and affect it, causing failure. Hovewer here we deem it required because we actually need
-    % this kind of behaviour when doing audit logging, an inability to append to the audit log
+    % this kind of behaviour when doing audit logging, as inability to append to the audit log
     % should cause whole operation to fail.
-    Mod:handle_beat(Beat, Metadata, Opts);
-handle_beat(_Beat, _Metadata, undefined) ->
+    _ = Mod:handle_beat(Beat, Metadata, Opts),
+    handle_beat(Beat, Metadata, Rest);
+handle_beat(_Beat, _Metadata, []) ->
     ok.

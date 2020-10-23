@@ -10,11 +10,11 @@
 %%
 
 -type opts() :: #{
-    pulse => bouncer_arbiter_pulse:handler()
+    pulse => bouncer_arbiter_pulse:handlers()
 }.
 
 -record(st, {
-    pulse          :: bouncer_arbiter_pulse:handler() | undefined,
+    pulse          :: bouncer_arbiter_pulse:handlers(),
     pulse_metadata :: bouncer_arbiter_pulse:metadata()
 }).
 
@@ -29,7 +29,7 @@ handle_function(Fn, Args, WoodyCtx, Opts) ->
 
 do_handle_function('Judge', {RulesetID, ContextIn}, WoodyCtx, Opts) ->
     St = #st{
-        pulse          = maps:get(pulse, Opts, undefined),
+        pulse          = maps:get(pulse, Opts, []),
         pulse_metadata = #{woody_ctx => WoodyCtx}
     },
     try handle_judge(RulesetID, ContextIn, St) catch

@@ -121,7 +121,7 @@ start_bouncer(Env, C) ->
         {services, #{
             arbiter => #{
                 path  => ArbiterPath,
-                pulse => {?MODULE, StashPid}
+                pulse => [{?MODULE, StashPid}]
             }
         }},
         {transport_opts, #{
