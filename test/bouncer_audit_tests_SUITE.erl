@@ -12,6 +12,7 @@
 -export([invalid_config_fails_start/1]).
 -export([unrecognized_config_fails_start/1]).
 -export([write_error_fails_request/1]).
+-export([write_queue_overload_fails_request/1]).
 
 -include_lib("bouncer_proto/include/bouncer_decisions_thrift.hrl").
 
@@ -34,6 +35,12 @@ all() ->
         invalid_config_fails_start,
         unrecognized_config_fails_start,
         write_error_fails_request
+        % TODO
+        % This testcase is currently failing consistently.
+        % Turns out logger (as of Erlang/OTP 23 w/ kernel 7.0) doesn't tell callers when specific
+        % handler loses an event due to queue flushing, even though doc says it should have.
+        % Best bet is to max out `flush_qlen` option in the meantime.
+        % write_queue_overload_fails_request
     ].
 
 -spec init_per_suite(config()) ->
@@ -71,6 +78,7 @@ end_per_testcase(_Name, _C) ->
 -spec invalid_config_fails_start(config()) -> ok.
 -spec unrecognized_config_fails_start(config()) -> ok.
 -spec write_error_fails_request(config()) -> ok.
+-spec write_queue_overload_fails_request(config()) -> ok.
 
 invalid_config_fails_start(C) ->
     ?assertError(
@@ -128,10 +136,9 @@ write_error_fails_request(C) ->
     Dirname = mk_temp_dir(?CONFIG(testcase, C)),
     Filename = filename:join(Dirname, "audit.log"),
     C1 = start_bouncer([{audit, #{
-        log => #{backend => #{
-            type => file,
-            file => Filename
-        }}
+        log => #{
+            backend => #{type => file, file => Filename}
+        }
     }}], C),
     Client = mk_client(C1),
     try
@@ -144,6 +151,34 @@ write_error_fails_request(C) ->
     after
         _ = rm_temp_dir(Dirname),
         stop_bouncer(C1)
+    end.
+
+write_queue_overload_fails_request(C) ->
+    QLen = 10,
+    Concurrency = QLen * 10,
+    Dirname = mk_temp_dir(?CONFIG(testcase, C)),
+    Filename = filename:join(Dirname, "audit.log"),
+    C1 = start_bouncer([{audit, #{
+        log => #{
+            backend => #{type => file, file => Filename, flush_qlen => QLen},
+            formatter => {logger_logstash_formatter, #{single_line => true}}
+        }
+    }}], C),
+    Client = mk_client(C1),
+    Results = genlib_pmap:safemap(
+        fun (_) ->
+            call_judge(?API_RULESET_ID, ?CONTEXT(#{}), Client)
+        end,
+        lists:seq(1, Concurrency)
+    ),
+    _ = stop_bouncer(C1),
+    try
+        {Succeeded, _Failed} = lists:partition(fun ({R, _}) -> R == ok end, Results),
+        {ok, LogfileContents} = file:read_file(Filename),
+        NumLogEvents = binary:matches(LogfileContents, <<"\"type\":\"audit\"">>), % TODO kinda hacky
+        ?assertEqual(length(Succeeded), length(NumLogEvents))
+    after
+        rm_temp_dir(Dirname)
     end.
 
 mk_temp_dir(Name) ->
