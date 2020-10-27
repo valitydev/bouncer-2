@@ -27,9 +27,13 @@
 %%
 
 -type handler() :: {module(), _Opts}.
+-type handler(St) :: {module(), St}.
 -type handlers() :: [handler()].
+-type handlers(St) :: [handler(St)].
 -export_type([handler/0]).
+-export_type([handler/1]).
 -export_type([handlers/0]).
+-export_type([handlers/1]).
 
 -callback handle_beat(beat(), metadata(), _Opts) ->
     ok.

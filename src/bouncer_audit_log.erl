@@ -1,16 +1,36 @@
 -module(bouncer_audit_log).
 
 -export([init/1]).
--export([stop/0]).
+-export([stop/1]).
 
 -behaviour(bouncer_arbiter_pulse).
 -export([handle_beat/3]).
+
+-define(DEFAULT_LOG_LEVEL, notice).
+-define(DEFAULT_SANE_QLEN, 10000). % TODO make configurable?
+-define(LOG_DOMAIN, [audit]).
 
 -type opts() :: #{
     log => log_opts() | disabled
 }.
 
+% NOTE
+% Keep in sync with `opts()`.
+-define(OPTS, [log]).
+
 -type log_opts() :: #{
+    % Which log level to use for audit events? Defaults to `notice`.
+    level => logger:level(),
+    backend => logger_backend_opts(),
+    % See: http://erlang.org/doc/man/logger.html#type-formatter_config
+    formatter => {module(), logger:formatter_config()}
+}.
+
+% NOTE
+% Keep in sync with `log_opts()`.
+-define(LOG_OPTS, [level, backend, formatter]).
+
+-type logger_backend_opts() :: #{
     % Where to log? Defaults to `standard_io`.
     type => standard_io | standard_error | file,
     % Log file location. No default, MUST be set if `type` is `file`.
@@ -20,49 +40,55 @@
     max_no_files => non_neg_integer()
 }.
 
--define(LOG_OPTS_KEYS, [
-    % NOTE
-    % Keep in sync w/ `log_opts()`.
-    type,
-    file,
-    max_no_bytes,
-    max_no_files
-]).
+% NOTE
+% Keep in sync with `logger_backend_opts()`.
+-define(LOGGER_BACKEND_OPTS, [type, file, max_no_bytes, max_no_files]).
 
 -export_type([opts/0]).
 
 %%
 
--define(LOG_DOMAIN, [audit]).
--define(DEFAULT_SANE_QLEN, 10000). % TODO make configurable?
+-type st() ::
+    {log, logger:level()}.
 
 -spec init(opts()) ->
-    bouncer_arbiter_pulse:handlers().
+    bouncer_arbiter_pulse:handlers(st()).
 init(Opts) ->
+    _ = assert_strict_opts(?OPTS, Opts),
     init_log_handler(maps:get(log, Opts, #{})).
 
 init_log_handler(LogOpts = #{}) ->
-    _ = assert_strict_opts(?LOG_OPTS_KEYS, LogOpts),
-    Type = validate_log_type(maps:get(type, LogOpts, standard_io)),
-    BackendConfig = mk_log_config(Type, LogOpts),
-    HandlerConfig = #{
+    _ = assert_strict_opts(?LOG_OPTS, LogOpts),
+    Level = validate_log_level(maps:get(level, LogOpts, ?DEFAULT_LOG_LEVEL)),
+    BackendConfig = mk_logger_backend_config(maps:get(backend, LogOpts, #{})),
+    HandlerConfig0 = maps:with([formatter], LogOpts),
+    HandlerConfig1 = HandlerConfig0#{
         config  => BackendConfig,
         % NOTE
         % This two options together ensure that _only_ audit logs will flow through to the backend.
         filters => [{domain, {fun logger_filters:domain/2, {log, sub, ?LOG_DOMAIN}}}],
-        filter_default => stop,
-        % FIXME
-        formatter => {logger_logstash_formatter, #{}}
+        filter_default => stop
     },
     ok = logger:add_handler(
         ?MODULE,
         logger_std_h,
-        HandlerConfig
+        HandlerConfig1
     ),
-    ok = log(alert, "audit log started", #{}),
-    [{?MODULE, log}];
+    % TODO
+    % Validate that global logger level doesn't suppress ours?
+    ok = log(Level, "audit log started", #{}),
+    [{?MODULE, {log, Level}}];
 init_log_handler(disabled) ->
     [].
+
+validate_log_level(Level) ->
+    eq = logger:compare_levels(Level, Level),
+    Level.
+
+mk_logger_backend_config(BackendOpts) ->
+    _ = assert_strict_opts(?LOGGER_BACKEND_OPTS, BackendOpts),
+    Type = validate_log_type(maps:get(type, BackendOpts, standard_io)),
+    mk_logger_backend_config(Type, BackendOpts).
 
 validate_log_type(Type) when
     Type == standard_io;
@@ -71,10 +97,10 @@ validate_log_type(Type) when
 ->
     Type;
 validate_log_type(Type) ->
-    erlang:error({invalid_log_type, Type}).
+    erlang:error(badarg, [Type]).
 
-mk_log_config(file = Type, Opts) ->
-    Defaults = get_default_log_config(Type),
+mk_logger_backend_config(file = Type, Opts) ->
+    Defaults = get_default_backend_config(Type),
     Filename = maps:get(file, Opts),
     Config0 = maps:with([max_no_bytes, max_no_files], Opts),
     Config = maps:merge(Defaults, Config0),
@@ -82,26 +108,26 @@ mk_log_config(file = Type, Opts) ->
         type => Type,
         file => Filename
     };
-mk_log_config(Type, _Opts) ->
-    Defaults = get_default_log_config(Type),
+mk_logger_backend_config(Type, _Opts) ->
+    Defaults = get_default_backend_config(Type),
     Defaults#{
         type => Type
     }.
 
-get_default_log_config(file) ->
+get_default_backend_config(file) ->
     % NOTE
     % All those options chosen to push message loss probability as close to zero as possible.
     % Zero doesn't seem reachable with standard logger infrastructure because of various safeguards
     % around unexpected backend and formatter errors.
-    Config = get_default_log_config(),
+    Config = get_default_backend_config(),
     Config#{
         % Protects against accidental write loss upon file rotation.
         file_check => 0
     };
-get_default_log_config(_Type) ->
-    get_default_log_config().
+get_default_backend_config(_Type) ->
+    get_default_backend_config().
 
-get_default_log_config() ->
+get_default_backend_config() ->
     #{
         % No need to set it up here since we'll sync on EVERY write by ourself.
         filesync_repeat_interval => no_repeat,
@@ -128,11 +154,19 @@ assert_strict_opts(Ks, Opts) ->
 
 %%
 
--spec stop() ->
+-spec stop(opts()) ->
     ok.
-stop() ->
-    ok = log(alert, "audit log stopped", #{}),
+stop(Opts = #{}) ->
+    stop_log_handler(maps:get(log, Opts, #{})).
+
+-spec stop_log_handler(log_opts()) ->
+    ok.
+stop_log_handler(LogOpts = #{}) ->
+    Level = maps:get(level, LogOpts, ?DEFAULT_LOG_LEVEL),
+    ok = log(Level, "audit log stopped", #{}),
     _ = logger:remove_handler(?MODULE),
+    ok;
+stop_log_handler(disabled) ->
     ok.
 
 %%
@@ -140,13 +174,11 @@ stop() ->
 -type beat()     :: bouncer_arbiter_pulse:beat().
 -type metadata() :: bouncer_arbiter_pulse:metadata().
 
--type pulse_opts() :: log.
-
--spec handle_beat(beat(), metadata(), pulse_opts()) ->
+-spec handle_beat(beat(), metadata(), st()) ->
     ok.
-handle_beat(Beat, Metadata, log) ->
+handle_beat(Beat, Metadata, {log, Level}) ->
     log(
-        get_severity(Beat),
+        get_severity(Beat, Level),
         get_message(Beat),
         extract_metadata(Metadata, get_beat_metadata(Beat))
     ).
@@ -163,8 +195,8 @@ log(Severity, Message, Metadata) ->
     ok = logger_std_h:filesync(?MODULE),
     ok.
 
-get_severity({judgement, started}) -> debug;
-get_severity(_)                    -> alert.
+get_severity({judgement, started}, _Level) -> debug;
+get_severity(_, Level)                     -> Level.
 
 get_message({judgement, started})        -> "judgement started";
 get_message({judgement, {completed, _}}) -> "judgement completed";
