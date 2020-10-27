@@ -7,7 +7,7 @@
 -export([handle_beat/3]).
 
 -define(DEFAULT_LOG_LEVEL, notice).
--define(DEFAULT_SANE_QLEN, 10000). % TODO make configurable?
+-define(DEFAULT_FLUSH_QLEN, 10000).
 -define(LOG_DOMAIN, [audit]).
 
 -type opts() :: #{
@@ -37,12 +37,15 @@
     file => file:filename(),
     % See: http://erlang.org/doc/man/logger_std_h.html
     max_no_bytes => pos_integer() | infinity,
-    max_no_files => non_neg_integer()
+    max_no_files => non_neg_integer(),
+    % Maximum number of events to queue for writing. Defaults to 10000.
+    % See: http://erlang.org/doc/apps/kernel/logger_chapter.html#message-queue-length
+    flush_qlen => non_neg_integer()
 }.
 
 % NOTE
 % Keep in sync with `logger_backend_opts()`.
--define(LOGGER_BACKEND_OPTS, [type, file, max_no_bytes, max_no_files]).
+-define(LOGGER_BACKEND_OPTS, [type, file, max_no_bytes, max_no_files, flush_qlen]).
 
 -export_type([opts/0]).
 
@@ -100,7 +103,7 @@ validate_log_type(Type) ->
     erlang:error(badarg, [Type]).
 
 mk_logger_backend_config(file = Type, Opts) ->
-    Defaults = get_default_backend_config(Type),
+    Defaults = get_default_backend_config(Type, Opts),
     Filename = maps:get(file, Opts),
     Config0 = maps:with([max_no_bytes, max_no_files], Opts),
     Config = maps:merge(Defaults, Config0),
@@ -108,34 +111,35 @@ mk_logger_backend_config(file = Type, Opts) ->
         type => Type,
         file => Filename
     };
-mk_logger_backend_config(Type, _Opts) ->
-    Defaults = get_default_backend_config(Type),
+mk_logger_backend_config(Type, Opts) ->
+    Defaults = get_default_backend_config(Type, Opts),
     Defaults#{
         type => Type
     }.
 
-get_default_backend_config(file) ->
+get_default_backend_config(file, Opts) ->
     % NOTE
     % All those options chosen to push message loss probability as close to zero as possible.
     % Zero doesn't seem reachable with standard logger infrastructure because of various safeguards
     % around unexpected backend and formatter errors.
-    Config = get_default_backend_config(),
+    Config = get_default_backend_config(Opts),
     Config#{
         % Protects against accidental write loss upon file rotation.
         file_check => 0
     };
-get_default_backend_config(_Type) ->
-    get_default_backend_config().
+get_default_backend_config(_Type, Opts) ->
+    get_default_backend_config(Opts).
 
-get_default_backend_config() ->
+get_default_backend_config(Opts) ->
+    FlushQLen = maps:get(flush_qlen, Opts, ?DEFAULT_FLUSH_QLEN),
     #{
         % No need to set it up here since we'll sync on EVERY write by ourself.
         filesync_repeat_interval => no_repeat,
 
         % See: http://erlang.org/doc/apps/kernel/logger_chapter.html#message-queue-length
         sync_mode_qlen => 0,
-        drop_mode_qlen => ?DEFAULT_SANE_QLEN,
-        flush_qlen => ?DEFAULT_SANE_QLEN,
+        drop_mode_qlen => FlushQLen,
+        flush_qlen => FlushQLen,
 
         % See: http://erlang.org/doc/apps/kernel/logger_chapter.html#controlling-bursts-of-log-requests
         burst_limit_enable => false,
