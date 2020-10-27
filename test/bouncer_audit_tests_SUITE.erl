@@ -147,7 +147,7 @@ write_error_fails_request(C) ->
     end.
 
 mk_temp_dir(Name) ->
-    TempDir = get_temp_dir(),
+    TempDir = ct_helper:get_temp_dir(),
     Random = binary_to_list(genlib:unique()),
     TargetDir = filename:join([TempDir, Name, Random]),
     ok = filelib:ensure_dir(filename:join(TargetDir, ".")),
@@ -160,23 +160,6 @@ rm_temp_dir(Dirname) ->
             ok;
         {error, Reason} ->
             ct:pal("unable to cleanup ~p: ~p", [Root, Reason])
-    end.
-
-get_temp_dir() ->
-    [Dir | _] = genlib_list:compact([
-        get_env("TMPDIR"),
-        get_env("TEMP"),
-        get_env("TMP"),
-        "/tmp"
-    ]),
-    Dir.
-
-get_env(Name) ->
-    case os:getenv(Name) of
-        V when is_list(V) ->
-            V;
-        false ->
-            undefined
     end.
 
 %%
