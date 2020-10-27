@@ -35,7 +35,7 @@
 
 -include_lib("bouncer_proto/include/bouncer_decisions_thrift.hrl").
 
--type config() :: [{atom(), term()}].
+-type config() :: ct_helper:config().
 -type group_name() :: atom().
 -type test_case_name() :: atom().
 
@@ -147,8 +147,10 @@ end_per_group(_Name, C) ->
     stop_bouncer(C).
 
 stop_bouncer(C) ->
-    with_config(group_apps, C, fun (Apps) -> genlib_app:stop_unload_applications(Apps) end),
-    with_config(stash, C, fun (Pid) -> ?assertEqual(ok, ct_stash:destroy(Pid)) end).
+    ct_helper:with_config(group_apps, C,
+        fun (Apps) -> genlib_app:stop_unload_applications(Apps) end),
+    ct_helper:with_config(stash, C,
+        fun (Pid) -> ?assertEqual(ok, ct_stash:destroy(Pid)) end).
 
 -spec init_per_testcase(atom(), config()) ->
     config().
@@ -616,13 +618,3 @@ flush_beats({WoodyCtx, _}, C) ->
 get_trace_id(WoodyCtx) ->
     RpcID = woody_context:get_rpc_id(WoodyCtx),
     maps:get(trace_id, RpcID).
-
-%%
-
--spec with_config(atom(), config(), fun ((_) -> R)) ->
-    R | undefined.
-with_config(Name, C, Fun) ->
-    case lists:keyfind(Name, 1, C) of
-        {_, V} -> Fun(V);
-        false  -> undefined
-    end.
