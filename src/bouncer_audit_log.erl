@@ -22,7 +22,7 @@
     % Which log level to use for audit events? Defaults to `notice`.
     level => logger:level(),
     backend => logger_backend_opts(),
-    % See: http://erlang.org/doc/man/logger.html#type-formatter_config
+    % http://erlang.org/doc/man/logger.html#type-formatter_config
     formatter => {module(), logger:formatter_config()}
 }.
 
@@ -35,11 +35,11 @@
     type => standard_io | standard_error | file,
     % Log file location. No default, MUST be set if `type` is `file`.
     file => file:filename(),
-    % See: http://erlang.org/doc/man/logger_std_h.html
+    % http://erlang.org/doc/man/logger_std_h.html
     max_no_bytes => pos_integer() | infinity,
     max_no_files => non_neg_integer(),
     % Maximum number of events to queue for writing. Defaults to 10000.
-    % See: http://erlang.org/doc/apps/kernel/logger_chapter.html#message-queue-length
+    % http://erlang.org/doc/apps/kernel/logger_chapter.html#message-queue-length
     flush_qlen => non_neg_integer()
 }.
 
@@ -136,15 +136,15 @@ get_default_backend_config(Opts) ->
         % No need to set it up here since we'll sync on EVERY write by ourself.
         filesync_repeat_interval => no_repeat,
 
-        % See: http://erlang.org/doc/apps/kernel/logger_chapter.html#message-queue-length
+        % http://erlang.org/doc/apps/kernel/logger_chapter.html#message-queue-length
         sync_mode_qlen => 0,
         drop_mode_qlen => FlushQLen,
         flush_qlen => FlushQLen,
 
-        % See: http://erlang.org/doc/apps/kernel/logger_chapter.html#controlling-bursts-of-log-requests
+        % http://erlang.org/doc/apps/kernel/logger_chapter.html#controlling-bursts-of-log-requests
         burst_limit_enable => false,
 
-        % See: http://erlang.org/doc/apps/kernel/logger_chapter.html#terminating-an-overloaded-handler
+        % http://erlang.org/doc/apps/kernel/logger_chapter.html#terminating-an-overloaded-handler
         overload_kill_enable => false
     }.
 
