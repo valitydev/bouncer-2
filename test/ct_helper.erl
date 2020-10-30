@@ -22,13 +22,12 @@ with_config(Name, C, Fun) ->
 -spec get_temp_dir() ->
     file:filename_all().
 get_temp_dir() ->
-    [Dir | _] = genlib_list:compact([
+    hd(genlib_list:compact([
         get_env("TMPDIR"),
         get_env("TEMP"),
         get_env("TMP"),
         "/tmp"
-    ]),
-    Dir.
+    ])).
 
 -spec get_env(string()) ->
     string() | undefined.
