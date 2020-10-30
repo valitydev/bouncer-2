@@ -4,6 +4,7 @@
 
 -behaviour(application).
 -export([start/2]).
+-export([prep_stop/1]).
 -export([stop/1]).
 
 %% Supervisor callbacks
@@ -19,6 +20,15 @@
 start(_StartType, _StartArgs) ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
+-spec prep_stop(State) ->
+    State.
+prep_stop(State) ->
+    % NOTE
+    % We have to do it in this magic `prep_stop/1` here because for some inexplicable reason the
+    % usual `stop/1` callback doesn't get called in common_test runs.
+    ok = bouncer_audit_log:stop(genlib_app:env(?MODULE, audit, #{})),
+    State.
+
 -spec stop(any()) ->
     ok.
 
@@ -31,6 +41,7 @@ stop(_State) ->
     {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 
 init([]) ->
+    AuditPulse = bouncer_audit_log:init(genlib_app:env(?MODULE, audit, #{})),
     ServiceOpts = genlib_app:env(?MODULE, services, #{}),
     EventHandlers = genlib_app:env(?MODULE, woody_event_handlers, [woody_event_handler_default]),
     Healthcheck = enable_health_logging(genlib_app:env(?MODULE, health_check, #{})),
@@ -43,7 +54,7 @@ init([]) ->
             transport_opts    => get_transport_opts(),
             shutdown_timeout  => get_shutdown_timeout(),
             event_handler     => EventHandlers,
-            handlers          => get_handler_specs(ServiceOpts),
+            handlers          => get_handler_specs(ServiceOpts, AuditPulse),
             additional_routes => [erl_health_handle:get_route(Healthcheck)]
         }
     ),
@@ -83,12 +94,13 @@ get_transport_opts() ->
 get_shutdown_timeout() ->
     genlib_app:env(?MODULE, shutdown_timeout, 0).
 
--spec get_handler_specs(map()) ->
+-spec get_handler_specs(map(), bouncer_arbiter_pulse:handlers()) ->
     [woody:http_handler(woody:th_handler())].
 
-get_handler_specs(ServiceOpts) ->
+get_handler_specs(ServiceOpts, AuditPulse) ->
     ArbiterService = maps:get(arbiter, ServiceOpts, #{}),
-    ArbiterOpts = maps:with([pulse], ArbiterService),
+    ArbiterPulse = maps:get(pulse, ArbiterService, []),
+    ArbiterOpts = #{pulse => AuditPulse ++ ArbiterPulse},
     [
         {
             maps:get(path, ArbiterService, <<"/v1/arbiter">>),
