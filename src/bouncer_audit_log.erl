@@ -202,9 +202,9 @@ log(Severity, Message, Metadata) ->
 get_severity({judgement, started}, _Level) -> debug;
 get_severity(_, Level)                     -> Level.
 
-get_message({judgement, started})        -> "judgement started";
-get_message({judgement, {completed, _}}) -> "judgement completed";
-get_message({judgement, {failed, _}})    -> "judgement failed".
+get_message({judgement, started})        -> <<"judgement started">>;
+get_message({judgement, {completed, _}}) -> <<"judgement completed">>;
+get_message({judgement, {failed, _}})    -> <<"judgement failed">>.
 
 get_beat_metadata({judgement, Event}) ->
     #{
