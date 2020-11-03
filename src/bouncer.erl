@@ -54,7 +54,8 @@ init([]) ->
             transport_opts    => get_transport_opts(),
             shutdown_timeout  => get_shutdown_timeout(),
             event_handler     => EventHandlers,
-            handlers          => get_handler_specs(ServiceOpts, AuditPulse),
+            handlers          =>
+                get_handler_specs(ServiceOpts, AuditPulse) ++ get_stub_handler_specs(ServiceOpts),
             additional_routes => [erl_health_handle:get_route(Healthcheck)]
         }
     ),
@@ -105,6 +106,17 @@ get_handler_specs(ServiceOpts, AuditPulse) ->
         {
             maps:get(path, ArbiterService, <<"/v1/arbiter">>),
             {{bouncer_decisions_thrift, 'Arbiter'}, {bouncer_arbiter_handler, ArbiterOpts}}
+        }
+    ].
+
+%% TODO delete after org_management is done
+get_stub_handler_specs(ServiceOpts) ->
+    OrgManagementStub = maps:get(org_management, ServiceOpts, #{}),
+    [
+        {
+            maps:get(path, OrgManagementStub, <<"/v1/org_management_stub">>),
+            {{orgmgmt_auth_context_provider_thrift, 'AuthContextProvider'},
+                bouncer_org_management_stub}
         }
     ].
 
