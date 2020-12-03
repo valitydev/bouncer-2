@@ -167,7 +167,8 @@ end_per_testcase(_Name, _C) ->
 %%
 
 -define(CONTEXT(Fragments), #bdcs_Context{fragments = Fragments}).
--define(JUDGEMENT(Resolution), #bdcs_Judgement{resolution = Resolution}).
+-define(JUDGEMENT(Resolution, ResolutionLegacy),
+    #bdcs_Judgement{resolution = Resolution, resolution_legacy = ResolutionLegacy}).
 
 -spec missing_ruleset_notfound(config()) -> ok.
 -spec incorrect_ruleset_invalid1(config()) -> ok.
@@ -361,7 +362,7 @@ allowed_create_invoice_shop_manager(C) ->
     ]),
     Context = ?CONTEXT(#{<<"root">> => mk_ctx_v1_fragment(Fragment)}),
     ?assertMatch(
-        ?JUDGEMENT(allowed),
+        ?JUDGEMENT({allowed, #bdcs_ResolutionAllowed{}}, allowed),
         call_judge(?API_RULESET_ID, Context, Client)
     ),
     ?assertMatch(
@@ -380,7 +381,7 @@ forbidden_expired(C) ->
     }),
     Context = ?CONTEXT(#{<<"root">> => mk_ctx_v1_fragment(Fragment)}),
     ?assertMatch(
-        ?JUDGEMENT(forbidden),
+        ?JUDGEMENT({forbidden, #bdcs_ResolutionForbidden{}}, forbidden),
         call_judge(?API_RULESET_ID, Context, Client)
     ),
     ?assertMatch(
@@ -398,7 +399,7 @@ forbidden_blacklisted_ip(C) ->
     ]),
     Context = ?CONTEXT(#{<<"root">> => mk_ctx_v1_fragment(Fragment)}),
     ?assertMatch(
-        ?JUDGEMENT(forbidden),
+        ?JUDGEMENT({forbidden, #bdcs_ResolutionForbidden{}}, forbidden),
         call_judge(?API_RULESET_ID, Context, Client)
     ),
     ?assertMatch(
@@ -410,7 +411,7 @@ forbidden_w_empty_context(C) ->
     Client1 = mk_client(C),
     EmptyFragment = mk_ctx_v1_fragment(#{}),
     ?assertMatch(
-        ?JUDGEMENT(forbidden),
+        ?JUDGEMENT({forbidden, #bdcs_ResolutionForbidden{}}, forbidden),
         call_judge(?API_RULESET_ID, ?CONTEXT(#{}), Client1)
     ),
     ?assertMatch(
@@ -419,7 +420,7 @@ forbidden_w_empty_context(C) ->
     ),
     Client2 = mk_client(C),
     ?assertMatch(
-        ?JUDGEMENT(forbidden),
+        ?JUDGEMENT({forbidden, #bdcs_ResolutionForbidden{}}, forbidden),
         call_judge(?API_RULESET_ID, ?CONTEXT(#{<<"empty">> => EmptyFragment}), Client2)
     ),
     ?assertMatch(

@@ -81,13 +81,19 @@ handle_network_error({unknown, Reason} = Error, St) ->
     thrift_judgement().
 encode_judgement({Resolution, _Assertions}) ->
     #bdcs_Judgement{
+        resolution_legacy = encode_resolution_legacy(Resolution),
         resolution = encode_resolution(Resolution)
     }.
 
-encode_resolution(allowed) ->
+encode_resolution_legacy(allowed) ->
     allowed;
-encode_resolution(forbidden) ->
+encode_resolution_legacy(forbidden) ->
     forbidden.
+
+encode_resolution(allowed) ->
+    {allowed, #bdcs_ResolutionAllowed{}};
+encode_resolution(forbidden) ->
+    {forbidden, #bdcs_ResolutionForbidden{}}.
 
 -spec decode_context(thrift_context(), st()) ->
     {bouncer_context:ctx(), st()}.
