@@ -1,11 +1,18 @@
 package trivial.incorrect3
 
-assertions := {
-    "forbidden" : { why | forbidden[why] }
+judgement := {
+    "resolution": ["forbidden", forbidden, allowed]
 }
 
 forbidden[why] {
     input
     not input.auth.method
     why := {}
+}
+
+allowed[why] = description {
+    input.auth.method == "SessionToken"
+    input.user
+    why := "its_a_user"
+    description := "Then why not?"
 }

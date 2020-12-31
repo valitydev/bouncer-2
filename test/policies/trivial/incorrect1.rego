@@ -1,5 +1,5 @@
 package trivial.incorrect1
 
-assertions := {
-    "fordibben" : { }
+judgement := {
+    "resolution" : []
 }

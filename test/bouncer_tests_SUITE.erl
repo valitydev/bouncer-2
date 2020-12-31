@@ -21,7 +21,7 @@
 -export([conflicting_context_invalid/1]).
 -export([distinct_sets_context_valid/1]).
 
--export([allowed_create_invoice_shop_manager/1]).
+-export([restricted_search_invoices_shop_manager/1]).
 -export([forbidden_w_empty_context/1]).
 -export([forbidden_expired/1]).
 -export([forbidden_blacklisted_ip/1]).
@@ -45,7 +45,7 @@
 
 -define(OPA_HOST, "opa").
 -define(OPA_ENDPOINT, {?OPA_HOST, 8181}).
--define(API_RULESET_ID, "authz/api").
+-define(API_RULESET_ID, "service/authz/api").
 
 -spec all() ->
     [atom()].
@@ -72,7 +72,7 @@ groups() ->
             distinct_sets_context_valid
         ]},
         {rules_authz_api, [parallel], [
-            allowed_create_invoice_shop_manager,
+            restricted_search_invoices_shop_manager,
             forbidden_expired,
             forbidden_blacklisted_ip,
             forbidden_w_empty_context
@@ -167,8 +167,8 @@ end_per_testcase(_Name, _C) ->
 %%
 
 -define(CONTEXT(Fragments), #bdcs_Context{fragments = Fragments}).
--define(JUDGEMENT(Resolution, ResolutionLegacy),
-    #bdcs_Judgement{resolution = Resolution, resolution_legacy = ResolutionLegacy}).
+-define(JUDGEMENT(Resolution),
+    #bdcs_Judgement{resolution = Resolution}).
 
 -spec missing_ruleset_notfound(config()) -> ok.
 -spec incorrect_ruleset_invalid1(config()) -> ok.
@@ -199,7 +199,7 @@ incorrect_ruleset_invalid1(C) ->
     ),
     ?assertMatch(
         {judgement, {failed, {ruleset_invalid, [
-            {data_invalid, _, no_extra_properties_allowed, _, [<<"fordibben">>]}
+            {data_invalid, _, wrong_size, _, [<<"resolution">>]}
         ]}}},
         lists:last(flush_beats(Client, C))
     ).
@@ -212,7 +212,7 @@ incorrect_ruleset_invalid2(C) ->
     ),
     ?assertMatch(
         {judgement, {failed, {ruleset_invalid, [
-            {data_invalid, _, wrong_type, _, [<<"allowed">>]}
+            {data_invalid, _, wrong_type, _, [<<"resolution">>, _]}
         ]}}},
         lists:last(flush_beats(Client, C))
     ).
@@ -225,7 +225,7 @@ incorrect_ruleset_invalid3(C) ->
     ),
     ?assertMatch(
         {judgement, {failed, {ruleset_invalid, [
-            {data_invalid, _, missing_required_property, <<"code">>, _}
+            {data_invalid, _, no_extra_items_allowed, [<<"forbidden">>, [#{}], #{}], _}
         ]}}},
         lists:last(flush_beats(Client, C))
     ).
@@ -343,17 +343,17 @@ distinct_sets_context_valid(C) ->
 
 %%
 
--spec allowed_create_invoice_shop_manager(config()) -> ok.
+-spec restricted_search_invoices_shop_manager(config()) -> ok.
 -spec forbidden_expired(config()) -> ok.
 -spec forbidden_blacklisted_ip(config()) -> ok.
 -spec forbidden_w_empty_context(config()) -> ok.
 
-allowed_create_invoice_shop_manager(C) ->
+restricted_search_invoices_shop_manager(C) ->
     Client = mk_client(C),
     Fragment = lists:foldl(fun maps:merge/2, #{}, [
         mk_auth_session_token(),
         mk_env(),
-        mk_op_create_invoice(<<"BLARG">>, <<"SHOP">>, <<"PARTY">>),
+        mk_op_search_invoices(mk_ordset([#{id => <<"SHOP">>}]), <<"PARTY">>),
         mk_user(<<"USER">>, mk_ordset([
             mk_user_org(<<"PARTY">>, <<"OWNER">>, mk_ordset([
                 mk_role(<<"Manager">>, <<"SHOP">>)
@@ -362,11 +362,11 @@ allowed_create_invoice_shop_manager(C) ->
     ]),
     Context = ?CONTEXT(#{<<"root">> => mk_ctx_v1_fragment(Fragment)}),
     ?assertMatch(
-        ?JUDGEMENT({allowed, #bdcs_ResolutionAllowed{}}, allowed),
+        ?JUDGEMENT({restricted, #bdcs_ResolutionRestricted{}}),
         call_judge(?API_RULESET_ID, Context, Client)
     ),
     ?assertMatch(
-        {judgement, {completed, {allowed, [{<<"user_has_role">>, _}]}}},
+        {judgement, {completed, {{restricted, _}, [{<<"org_role_allows_operation">>, _}]}}},
         lists:last(flush_beats(Client, C))
     ).
 
@@ -381,7 +381,7 @@ forbidden_expired(C) ->
     }),
     Context = ?CONTEXT(#{<<"root">> => mk_ctx_v1_fragment(Fragment)}),
     ?assertMatch(
-        ?JUDGEMENT({forbidden, #bdcs_ResolutionForbidden{}}, forbidden),
+        ?JUDGEMENT({forbidden, #bdcs_ResolutionForbidden{}}),
         call_judge(?API_RULESET_ID, Context, Client)
     ),
     ?assertMatch(
@@ -399,7 +399,7 @@ forbidden_blacklisted_ip(C) ->
     ]),
     Context = ?CONTEXT(#{<<"root">> => mk_ctx_v1_fragment(Fragment)}),
     ?assertMatch(
-        ?JUDGEMENT({forbidden, #bdcs_ResolutionForbidden{}}, forbidden),
+        ?JUDGEMENT({forbidden, #bdcs_ResolutionForbidden{}}),
         call_judge(?API_RULESET_ID, Context, Client)
     ),
     ?assertMatch(
@@ -411,7 +411,7 @@ forbidden_w_empty_context(C) ->
     Client1 = mk_client(C),
     EmptyFragment = mk_ctx_v1_fragment(#{}),
     ?assertMatch(
-        ?JUDGEMENT({forbidden, #bdcs_ResolutionForbidden{}}, forbidden),
+        ?JUDGEMENT({forbidden, #bdcs_ResolutionForbidden{}}),
         call_judge(?API_RULESET_ID, ?CONTEXT(#{}), Client1)
     ),
     ?assertMatch(
@@ -420,7 +420,7 @@ forbidden_w_empty_context(C) ->
     ),
     Client2 = mk_client(C),
     ?assertMatch(
-        ?JUDGEMENT({forbidden, #bdcs_ResolutionForbidden{}}, forbidden),
+        ?JUDGEMENT({forbidden, #bdcs_ResolutionForbidden{}}),
         call_judge(?API_RULESET_ID, ?CONTEXT(#{<<"empty">> => EmptyFragment}), Client2)
     ),
     ?assertMatch(
@@ -453,12 +453,11 @@ mk_auth_session_token(ExpiresAt) ->
         expiration => format_ts(ExpiresAt, second)
     }}.
 
-mk_op_create_invoice(InvoiceID, ShopID, PartyID) ->
-    #{capi => #{
+mk_op_search_invoices(Shops, PartyID) ->
+    #{anapi => #{
         op => #{
-            id      => <<"CreateInvoice">>,
-            invoice => #{id => InvoiceID},
-            shop    => #{id => ShopID},
+            id      => <<"SearchInvoices">>,
+            shops   => Shops,
             party   => #{id => PartyID}
         }
     }}.

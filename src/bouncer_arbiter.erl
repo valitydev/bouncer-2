@@ -15,7 +15,7 @@
 -type ruleset_id() :: iodata().
 
 -type judgement()  :: {resolution(), [assertion()]}.
--type resolution() :: allowed | forbidden.
+-type resolution() :: allowed | forbidden | {restricted, map()}.
 -type assertion()  :: {_Code :: binary(), _Details :: #{binary() => _}}.
 
 -export_type([judgement/0]).
@@ -35,7 +35,7 @@
 judge(RulesetID, Context) ->
     case mk_opa_client() of
         {ok, Client} ->
-            Location = join_path(RulesetID, <<"/assertions">>),
+            Location = join_path(RulesetID, <<"/judgement">>),
             case request_opa_document(Location, Context, Client) of
                 {ok, Document} ->
                     infer_judgement(Document);
@@ -53,19 +53,20 @@ judge(RulesetID, Context) ->
 infer_judgement(Document) ->
     case jesse:validate_with_schema(get_judgement_schema(), Document) of
         {ok, _} ->
-            Allowed = maps:get(<<"allowed">>, Document, []),
-            Forbidden = maps:get(<<"forbidden">>, Document, []),
-            {ok, infer_judgement(Forbidden, Allowed)};
+            {ok, parse_judgement(Document)};
         {error, Reason} ->
             {error, {ruleset_invalid, Reason}}
     end.
 
-infer_judgement(Forbidden = [_ | _], _Allowed) ->
-    {forbidden, extract_assertions(Forbidden)};
-infer_judgement(_Forbidden = [], Allowed = [_ | _]) ->
-    {allowed, extract_assertions(Allowed)};
-infer_judgement(_Forbidden = [], _Allowed = []) ->
-    {forbidden, []}.
+parse_judgement(#{<<"resolution">> := [<<"forbidden">>, Assertions]}) ->
+    {forbidden, extract_assertions(Assertions)};
+parse_judgement(#{<<"resolution">> := [<<"allowed">>, Assertions]}) ->
+    {allowed, extract_assertions(Assertions)};
+parse_judgement(#{
+    <<"resolution">> := [<<"restricted">>, Assertions],
+    <<"restrictions">> := Restrictions
+}) ->
+    {{restricted, Restrictions}, extract_assertions(Assertions)}.
 
 extract_assertions(Assertions) ->
     [extract_assertion(E) || E <- Assertions].
@@ -91,14 +92,29 @@ get_judgement_schema() ->
             ]}
         ]}
     ],
+    ResolutionSchema = [
+        {<<"type">>, <<"array">>},
+        {<<"items">>, [
+            [
+                {<<"type">>, <<"string">>},
+                {<<"pattern">>, <<"allowed|forbidden|restricted">>}
+            ],
+            AssertionsSchema
+        ]},
+        {<<"minItems">>, 2},
+        {<<"additionalItems">>, false}
+    ],
     [
         {<<"$schema">>, <<"http://json-schema.org/draft-04/schema#">>},
         {<<"type">>, <<"object">>},
         {<<"properties">>, [
-            {<<"allowed">>, AssertionsSchema},
-            {<<"forbidden">>, AssertionsSchema}
+            {<<"resolution">>, ResolutionSchema},
+            {<<"restrictions">>, [
+                {<<"type">>, <<"object">>}
+            ]}
         ]},
-        {<<"additionalProperties">>, false}
+        {<<"additionalProperties">>, false},
+        {<<"required">>, [<<"resolution">>]}
     ].
 
 %%

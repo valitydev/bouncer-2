@@ -1,0 +1,45 @@
+{
+  "roles": {
+    "Manager" : {
+      "apis": {
+        "AnalyticsAPI" : {
+          "operations": [
+            "SearchInvoices",
+            "SearchPayments",
+            "SearchRefunds",
+            "SearchChargebacks"
+          ]
+        }
+      }
+    },
+    "Administrator" : {
+      "apis": {
+        "AnalyticsAPI" : {
+          "operations": [
+            "SearchInvoices",
+            "SearchPayments",
+            "SearchRefunds",
+            "SearchPayouts",
+            "SearchReports",
+            "SearchChargebacks",
+            "GetReport",
+            "CreateReport",
+            "CancelReport",
+            "DownloadFile",
+            "GetPaymentsToolDistribution",
+            "GetPaymentsAmount",
+            "GetAveragePayment",
+            "GetPaymentsCount",
+            "GetPaymentsErrorDistribution",
+            "GetPaymentsSplitAmount",
+            "GetPaymentsSplitCount",
+            "GetRefundsAmount",
+            "GetCurrentBalances",
+            "GetPaymentsSubErrorDistribution",
+            "GetCurrentBalancesGroupByShop"
+          ]
+        }
+      }
+    }
+  }
+}

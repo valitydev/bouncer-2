@@ -25,7 +25,7 @@
 
 -define(OPA_HOST, "opa").
 -define(OPA_ENDPOINT, {?OPA_HOST, 8181}).
--define(API_RULESET_ID, "authz/api").
+-define(API_RULESET_ID, "service/authz/api").
 
 -spec all() ->
     [atom()].

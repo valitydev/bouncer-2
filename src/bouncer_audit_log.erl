@@ -217,7 +217,8 @@ get_beat_metadata({judgement, Event}) ->
                 #{
                     event => completed,
                     resolution => encode_resolution(Resolution),
-                    assertions => lists:map(fun encode_assertion/1, Assertions)
+                    assertions => lists:map(fun encode_assertion/1, Assertions),
+                    restrictions => encode_restrictions(Resolution)
                 };
             {failed, Error} ->
                 #{
@@ -228,7 +229,15 @@ get_beat_metadata({judgement, Event}) ->
     }.
 
 encode_resolution(allowed)   -> <<"allowed">>;
-encode_resolution(forbidden) -> <<"forbidden">>.
+encode_resolution(forbidden) -> <<"forbidden">>;
+encode_resolution({restricted, _Restrictions}) -> <<"restricted">>.
+
+%% NOTE
+%% I judged adding restrictions parsing to be not worth it for audit log
+encode_restrictions({restricted, Restrictions}) ->
+    Restrictions;
+encode_restrictions(_) ->
+    undefined.
 
 encode_assertion({Code, Details}) ->
     #{code => Code, details => Details}.
