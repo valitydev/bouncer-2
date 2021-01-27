@@ -12,14 +12,16 @@
 %% Which we won't consider conflicting, when they're obviously referring to the same
 %% «organization».
 
--type ctx() :: #{
-    atom() => number() | binary() | ctx() | set(ctx())
-}.
+-type value() :: number() | binary() | ctx() | set(ctx()) | json().
+-type ctx() :: #{atom() => value()}.
+
+-type json() :: null | boolean() | number() | binary() | [json()] | #{binary() => json()}.
 
 -export([empty/0]).
 -export([merge/2]).
 
 -export_type([ctx/0]).
+-export_type([value/0]).
 
 %%
 

@@ -15,7 +15,10 @@
 -export([write_error_fails_request/1]).
 -export([write_queue_contention/1]).
 
+-export([json_context_logs_ok/1]).
+
 -include_lib("bouncer_proto/include/bouncer_decisions_thrift.hrl").
+-include("ct_fixtures.hrl").
 
 -type config() :: ct_helper:config().
 -type testcase_name() :: atom().
@@ -34,7 +37,8 @@ all() ->
         invalid_config_fails_start,
         unrecognized_config_fails_start,
         {group, write_error_fails_request},
-        write_queue_contention
+        write_queue_contention,
+        json_context_logs_ok
     ].
 
 -spec groups() -> [ct_suite:ct_group_def()].
@@ -74,6 +78,7 @@ end_per_testcase(_Name, _C) ->
 -spec unrecognized_config_fails_start(config()) -> ok.
 -spec write_error_fails_request(config()) -> ok.
 -spec write_queue_contention(config()) -> ok.
+-spec json_context_logs_ok(config()) -> ok.
 
 invalid_config_fails_start(C) ->
     ?assertError(
@@ -199,17 +204,52 @@ write_queue_contention(C) ->
     _ = stop_bouncer(C1),
     try
         {Succeeded, _Failed} = lists:partition(fun({R, _}) -> R == ok end, Results),
-        {ok, LogfileContents} = file:read_file(Filename),
-        LogfileLines = [string:trim(L) || L <- string:split(LogfileContents, "\n", all)],
-        LogfileEvents = [jsx:decode(L) || L <- LogfileLines, byte_size(L) > 0],
-        CompletedEvents = [
-            Event
-            || Event = #{<<"judgement">> := #{<<"event">> := <<"completed">>}} <- LogfileEvents
-        ],
+        CompletedEvents = grab_completed_events(Filename),
         ?assertEqual(length(Succeeded), length(CompletedEvents))
     after
         rm_temp_dir(Dirname)
     end.
+
+json_context_logs_ok(C) ->
+    Dirname = mk_temp_dir(?CONFIG(testcase, C)),
+    Filename = filename:join(Dirname, "audit.log"),
+    C1 = start_bouncer(
+        [
+            {audit, #{
+                log => #{
+                    backend => #{type => file, file => Filename},
+                    formatter => {logger_logstash_formatter, #{}}
+                }
+            }}
+        ],
+        C
+    ),
+    Client = mk_client(C1),
+    Params = ?SOME_JSON,
+    Fragment = #{capi => #{op => #{params => Params}}},
+    Context = ?CONTEXT(#{
+        <<"frag1">> => mk_ctx_v1_fragment(Fragment)
+    }),
+    ?assertMatch(
+        #bdcs_Judgement{},
+        call_judge(?API_RULESET_ID, Context, Client)
+    ),
+    _ = stop_bouncer(C1),
+    try
+        Events = grab_completed_events(Filename),
+        ?assertMatch(
+            [#{<<"context">> := #{<<"capi">> := #{<<"op">> := #{<<"params">> := Params}}}}],
+            Events
+        )
+    after
+        _ = rm_temp_dir(Dirname)
+    end.
+
+grab_completed_events(Filename) ->
+    {ok, LogfileContents} = file:read_file(Filename),
+    LogfileLines = [string:trim(L) || L <- string:split(LogfileContents, "\n", all)],
+    LogfileEvents = [jiffy:decode(L, [return_maps]) || L <- LogfileLines, byte_size(L) > 0],
+    [Event || Event = #{<<"judgement">> := #{<<"event">> := <<"completed">>}} <- LogfileEvents].
 
 mk_temp_dir(Name) ->
     TempDir = ct_helper:get_temp_dir(),
@@ -233,6 +273,10 @@ mk_client(C) ->
     WoodyCtx = woody_context:new(genlib:to_binary(?CONFIG(testcase, C))),
     ServiceURLs = ?CONFIG(service_urls, C),
     {WoodyCtx, ServiceURLs}.
+
+mk_ctx_v1_fragment(Context) ->
+    {ok, Content} = bouncer_context_v1:encode(thrift, Context),
+    #bctx_ContextFragment{type = v1_thrift_binary, content = Content}.
 
 call_judge(RulesetID, Context, Client) ->
     call(arbiter, 'Judge', {genlib:to_binary(RulesetID), Context}, Client).

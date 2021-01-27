@@ -191,7 +191,7 @@ request_opa_document(ID, Input, {Client, Opts}) ->
     % TODO
     % A bit hacky, ordsets are allowed in context and supposed to be opaque, at least by design.
     % We probably need something like `bouncer_context:to_json/1`.
-    Body = jsx:encode(#{input => Input}),
+    Body = jiffy:encode(#{input => Input}),
     CType = <<"application/json; charset=utf-8">>,
     Headers = #{
         <<"content-type">> => CType,
@@ -220,7 +220,7 @@ request_opa_document(ID, Input, {Client, Opts}) ->
 
 -spec decode_document(binary()) -> {ok, document()} | {error, notfound}.
 decode_document(Response) ->
-    case jsx:decode(Response) of
+    case jiffy:decode(Response, [return_maps]) of
         #{<<"result">> := Result} ->
             {ok, Result};
         #{} ->

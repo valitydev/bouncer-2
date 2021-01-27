@@ -11,6 +11,7 @@
         scoper,
         thrift,
         gun,
+        jiffy,
         jesse,
         bouncer_proto,
         org_management_proto,

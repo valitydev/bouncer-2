@@ -95,8 +95,8 @@ encode_resolution({restricted, Restrictions}) ->
     }}.
 
 encode_restrictions(Restrictions) ->
-    {struct, _, StructDef} = bouncer_restriction_thrift:struct_info('Restrictions'),
-    bouncer_thrift:json_to_thrift_struct(StructDef, Restrictions, #brstn_Restrictions{}).
+    Type = {struct, struct, {bouncer_restriction_thrift, 'Restrictions'}},
+    bouncer_thrift:json_to_thrift(Type, Restrictions).
 
 -spec decode_context(thrift_context(), st()) -> {bouncer_context:ctx(), st()}.
 decode_context(#bdcs_Context{fragments = FragmentsIn}, St0) ->

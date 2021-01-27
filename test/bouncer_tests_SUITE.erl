@@ -35,6 +35,7 @@
 -export([handle_beat/3]).
 
 -include_lib("bouncer_proto/include/bouncer_decisions_thrift.hrl").
+-include("ct_fixtures.hrl").
 
 -type config() :: ct_helper:config().
 -type group_name() :: atom().
@@ -67,7 +68,8 @@ groups() ->
             missing_content_invalid_context,
             junk_content_invalid_context,
             conflicting_context_invalid,
-            distinct_sets_context_valid
+            distinct_sets_context_valid,
+            json_context_valid
         ]},
         {rules_authz_api, [parallel], [
             restricted_search_invoices_shop_manager,
@@ -172,6 +174,7 @@ end_per_testcase(_Name, _C) ->
 -spec junk_content_invalid_context(config()) -> ok.
 -spec conflicting_context_invalid(config()) -> ok.
 -spec distinct_sets_context_valid(config()) -> ok.
+-spec json_context_valid(config()) -> ok.
 
 missing_ruleset_notfound(C) ->
     Client = mk_client(C),
@@ -337,6 +340,25 @@ distinct_sets_context_valid(C) ->
     Context = ?CONTEXT(#{
         <<"frag1">> => mk_ctx_v1_fragment(Fragment1),
         <<"frag2">> => mk_ctx_v1_fragment(Fragment2)
+    }),
+    ?assertMatch(
+        #bdcs_Judgement{},
+        call_judge(?API_RULESET_ID, Context, Client)
+    ),
+    ?assertMatch(
+        {judgement, {completed, _}},
+        lists:last(flush_beats(Client, C))
+    ).
+
+json_context_valid(C) ->
+    Client = mk_client(C),
+    Fragment = #{
+        capi => #{
+            op => #{params => ?SOME_JSON}
+        }
+    },
+    Context = ?CONTEXT(#{
+        <<"frag1">> => mk_ctx_v1_fragment(Fragment)
     }),
     ?assertMatch(
         #bdcs_Judgement{},

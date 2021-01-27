@@ -18,9 +18,8 @@
 
 %%
 
--define(THRIFT_TYPE,
-    {struct, struct, {bouncer_context_v1_thrift, 'ContextFragment'}}
-).
+-define(THRIFT_MODULE, bouncer_context_v1_thrift).
+-define(THRIFT_TYPE, {struct, struct, {?THRIFT_MODULE, 'ContextFragment'}}).
 
 -type thrift_ctx_fragment() :: bouncer_context_v1_thrift:'ContextFragment'().
 
@@ -57,7 +56,16 @@ from_thrift_context(Ctx) ->
         bouncer_context_v1_thrift:struct_info('ContextFragment'),
     % NOTE
     % This 3 refers to the first data field in a ContextFragment, after version field.
-    bouncer_thrift:from_thrift_struct(StructDef, Ctx, 3, #{}).
+    bouncer_thrift:from_thrift_struct(StructDef, Ctx, 3, fun from_thrift_mapper/2).
+
+from_thrift_mapper({struct, _, {?THRIFT_MODULE, 'JSON'}}, V) ->
+    {ok, from_thrift_json(V)};
+from_thrift_mapper(_, _) ->
+    undefined.
+
+-spec from_thrift_json(bouncer_context_v1_thrift:'JSON'()) -> bouncer_context:value().
+from_thrift_json(#bctx_v1_JSON{data = V}) ->
+    jiffy:decode(V, [return_maps]).
 
 -spec try_upgrade(thrift_ctx_fragment()) -> thrift_ctx_fragment().
 try_upgrade(#bctx_v1_ContextFragment{vsn = ?BCTX_V1_HEAD} = Ctx) ->
@@ -78,5 +86,13 @@ encode(thrift, Context) ->
 
 -spec to_thrift(bouncer_context:ctx()) -> thrift_ctx_fragment() | no_return().
 to_thrift(Context) ->
-    {struct, _, StructDef} = bouncer_context_v1_thrift:struct_info('ContextFragment'),
-    bouncer_thrift:to_thrift_struct(StructDef, Context, #bctx_v1_ContextFragment{}).
+    bouncer_thrift:to_thrift(?THRIFT_TYPE, Context, fun to_thrift_mapper/2).
+
+to_thrift_mapper({struct, _, {?THRIFT_MODULE, 'JSON'}}, V) ->
+    {ok, to_thrift_json(V)};
+to_thrift_mapper(_, _) ->
+    undefined.
+
+-spec to_thrift_json(bouncer_context:value()) -> bouncer_context_v1_thrift:'JSON'().
+to_thrift_json(V) ->
+    #bctx_v1_JSON{data = jiffy:encode(V)}.
