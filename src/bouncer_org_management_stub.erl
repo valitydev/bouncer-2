@@ -9,7 +9,8 @@
 -export([handle_function/4]).
 
 -define(THRIFT_TYPE,
-    {struct, struct, {bouncer_context_v1_thrift, 'ContextFragment'}}).
+    {struct, struct, {bouncer_context_v1_thrift, 'ContextFragment'}}
+).
 
 -spec handle_function(woody:func(), woody:args(), woody_context:ctx(), woody_state:st()) ->
     {ok, woody:result()}.
@@ -17,10 +18,13 @@ handle_function('GetUserContext', {UserID}, _WoodyCtx, _Opts) ->
     ContextFragmentV1 = #bctx_v1_ContextFragment{
         user = #bctx_v1_User{
             id = UserID,
-            orgs = [#bctx_v1_Organization{
-                id = UserID,
-                owner = #bctx_v1_Entity{id = UserID}
-            }]
+            orgs = [
+                #bctx_v1_Organization{
+                    id = UserID,
+                    owner = #bctx_v1_Entity{id = UserID},
+                    party = #bctx_v1_Entity{id = UserID}
+                }
+            ]
         }
     },
     {ok, #bctx_ContextFragment{
