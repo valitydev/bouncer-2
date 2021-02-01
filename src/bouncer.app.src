@@ -13,6 +13,7 @@
         gun,
         jesse,
         bouncer_proto,
+        org_management_proto,
         erl_health
     ]},
     {env, []},
