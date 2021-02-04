@@ -28,16 +28,13 @@
 -define(OPA_ENDPOINT, {?OPA_HOST, 8181}).
 -define(API_RULESET_ID, "service/authz/api").
 
--spec all() ->
-    [atom()].
-
+-spec all() -> [atom()].
 all() ->
     [
         {group, general}
     ].
 
--spec groups() ->
-    [{group_name(), list(), [test_case_name()]}].
+-spec groups() -> [{group_name(), list(), [test_case_name()]}].
 groups() ->
     [
         {general, [parallel], [
@@ -45,27 +42,21 @@ groups() ->
         ]}
     ].
 
--spec init_per_suite(config()) ->
-    config().
-
+-spec init_per_suite(config()) -> config().
 init_per_suite(C) ->
     Apps =
         genlib_app:start_application(woody) ++
-        genlib_app:start_application_with(scoper, [
-            {storage, scoper_storage_logger}
-        ]),
+            genlib_app:start_application_with(scoper, [
+                {storage, scoper_storage_logger}
+            ]),
     [{suite_apps, Apps} | C].
 
--spec end_per_suite(config()) ->
-    ok.
+-spec end_per_suite(config()) -> ok.
 end_per_suite(C) ->
     genlib_app:stop_unload_applications(?CONFIG(suite_apps, C)).
 
--spec init_per_group(group_name(), config()) ->
-    config().
-init_per_group(Name, C) when
-    Name == general
-->
+-spec init_per_group(group_name(), config()) -> config().
+init_per_group(Name, C) when Name == general ->
     start_bouncer([], C);
 init_per_group(_Name, C) ->
     C.
@@ -74,15 +65,18 @@ start_bouncer(Env, C) ->
     IP = "127.0.0.1",
     Port = 8022,
     OrgmgmtPath = <<"/v1/org_management_stub">>,
-    Apps = genlib_app:start_application_with(bouncer, [
-        {ip, IP},
-        {port, Port},
-        {services, #{
-            org_management => #{
-                path  => OrgmgmtPath
-            }
-        }}
-    ] ++ Env),
+    Apps = genlib_app:start_application_with(
+        bouncer,
+        [
+            {ip, IP},
+            {port, Port},
+            {services, #{
+                org_management => #{
+                    path => OrgmgmtPath
+                }
+            }}
+        ] ++ Env
+    ),
     Services = #{
         org_management => mk_url(IP, Port, OrgmgmtPath)
     },
@@ -91,24 +85,22 @@ start_bouncer(Env, C) ->
 mk_url(IP, Port, Path) ->
     iolist_to_binary(["http://", IP, ":", genlib:to_binary(Port), Path]).
 
--spec end_per_group(group_name(), config()) ->
-    _.
+-spec end_per_group(group_name(), config()) -> _.
 end_per_group(_Name, C) ->
     stop_bouncer(C).
 
 stop_bouncer(C) ->
-    ct_helper:with_config(group_apps, C,
-        fun (Apps) -> genlib_app:stop_unload_applications(Apps) end).
+    ct_helper:with_config(
+        group_apps,
+        C,
+        fun(Apps) -> genlib_app:stop_unload_applications(Apps) end
+    ).
 
--spec init_per_testcase(atom(), config()) ->
-    config().
-
+-spec init_per_testcase(atom(), config()) -> config().
 init_per_testcase(Name, C) ->
     [{testcase, Name} | C].
 
--spec end_per_testcase(atom(), config()) ->
-    config().
-
+-spec end_per_testcase(atom(), config()) -> config().
 end_per_testcase(_Name, _C) ->
     ok.
 

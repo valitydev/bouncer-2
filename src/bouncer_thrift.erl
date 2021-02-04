@@ -12,12 +12,18 @@
 
 -type type_ref() :: {module(), atom()}.
 -type field_type() ::
-    bool | byte | i16 | i32 | i64 | string | double |
-    {enum, type_ref()} |
-    {struct, struct_flavour(), type_ref()} |
-    {list, field_type()} |
-    {set, field_type()} |
-    {map, field_type(), field_type()}.
+    bool
+    | byte
+    | i16
+    | i32
+    | i64
+    | string
+    | double
+    | {enum, type_ref()}
+    | {struct, struct_flavour(), type_ref()}
+    | {list, field_type()}
+    | {set, field_type()}
+    | {map, field_type(), field_type()}.
 
 -type struct_field_info() ::
     {field_num(), field_req(), field_type(), field_name(), any()}.

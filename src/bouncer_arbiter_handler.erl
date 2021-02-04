@@ -5,6 +5,7 @@
 %% Woody handler
 
 -behaviour(woody_server_thrift_handler).
+
 -export([handle_function/4]).
 
 %%
@@ -14,7 +15,7 @@
 }.
 
 -record(st, {
-    pulse          :: bouncer_arbiter_pulse:handlers(),
+    pulse :: bouncer_arbiter_pulse:handlers(),
     pulse_metadata :: bouncer_arbiter_pulse:metadata()
 }).
 
@@ -27,10 +28,12 @@ handle_function(Fn, Args, WoodyCtx, Opts) ->
 
 do_handle_function('Judge', {RulesetID, ContextIn}, WoodyCtx, Opts) ->
     St = #st{
-        pulse          = maps:get(pulse, Opts, []),
+        pulse = maps:get(pulse, Opts, []),
         pulse_metadata = #{woody_ctx => WoodyCtx}
     },
-    try handle_judge(RulesetID, ContextIn, St) catch
+    try
+        handle_judge(RulesetID, ContextIn, St)
+    catch
         throw:{woody, Class, Details} ->
             woody_error:raise(Class, Details);
         C:R:S ->
@@ -58,8 +61,7 @@ handle_judge(RulesetID, ContextIn, St0) ->
             handle_network_error(Reason, St2)
     end.
 
--spec handle_network_error(_Reason, st()) ->
-    no_return().
+-spec handle_network_error(_Reason, st()) -> no_return().
 handle_network_error({unavailable, Reason} = Error, St) ->
     ok = handle_judgement_beat({failed, Error}, St),
     throw({woody, system, {external, resource_unavailable, genlib:format(Reason)}});
@@ -69,16 +71,15 @@ handle_network_error({unknown, Reason} = Error, St) ->
 
 %%
 
--type fragment_id()       :: binary().
+-type fragment_id() :: binary().
 -type fragment_metadata() :: #{atom() => _}.
 
--type thrift_judgement()     :: bouncer_decisions_thrift:'Judgement'().
--type thrift_context()       :: bouncer_decisions_thrift:'Context'().
--type thrift_fragment()      :: bouncer_context_thrift:'ContextFragment'().
+-type thrift_judgement() :: bouncer_decisions_thrift:'Judgement'().
+-type thrift_context() :: bouncer_decisions_thrift:'Context'().
+-type thrift_fragment() :: bouncer_context_thrift:'ContextFragment'().
 -type thrift_fragment_type() :: bouncer_context_thrift:'ContextFragmentType'().
 
--spec encode_judgement(bouncer_arbiter:judgement()) ->
-    thrift_judgement().
+-spec encode_judgement(bouncer_arbiter:judgement()) -> thrift_judgement().
 encode_judgement({Resolution, _Assertions}) ->
     #bdcs_Judgement{
         resolution = encode_resolution(Resolution)
@@ -97,15 +98,14 @@ encode_restrictions(Restrictions) ->
     {struct, _, StructDef} = bouncer_restriction_thrift:struct_info('Restrictions'),
     bouncer_thrift:json_to_thrift_struct(StructDef, Restrictions, #brstn_Restrictions{}).
 
--spec decode_context(thrift_context(), st()) ->
-    {bouncer_context:ctx(), st()}.
+-spec decode_context(thrift_context(), st()) -> {bouncer_context:ctx(), st()}.
 decode_context(#bdcs_Context{fragments = FragmentsIn}, St0) ->
     % 1. Decode each fragment.
     {Fragments, St1} = decode_fragments(FragmentsIn, St0),
     % 2. Merge each decoded context into an empty context. Accumulate conflicts associated with
     % corresponding fragment id.
     {Ctx, Conflicts} = maps:fold(
-        fun (ID, Ctx, {CtxAcc, DiscardAcc}) ->
+        fun(ID, Ctx, {CtxAcc, DiscardAcc}) ->
             case bouncer_context:merge(CtxAcc, Ctx) of
                 {CtxAcc1, undefined} ->
                     {CtxAcc1, DiscardAcc};
@@ -135,14 +135,14 @@ decode_context(#bdcs_Context{fragments = FragmentsIn}, St0) ->
     {#{fragment_id() => bouncer_context:ctx()}, st()}.
 decode_fragments(Fragments, St0) ->
     {Ctxs, Errors, PulseMeta} = maps:fold(
-        fun (ID, Fragment, {CtxAcc, ErrorAcc, PulseMetaAcc}) ->
+        fun(ID, Fragment, {CtxAcc, ErrorAcc, PulseMetaAcc}) ->
             Type = Fragment#bctx_ContextFragment.type,
             Content = genlib:define(Fragment#bctx_ContextFragment.content, <<>>),
             case decode_fragment(Type, Content) of
                 {ok, Ctx, Meta} ->
                     PulseMeta = #{
-                        type     => Type,
-                        context  => Ctx,
+                        type => Type,
+                        context => Ctx,
                         metadata => Meta
                     },
                     {
@@ -177,12 +177,10 @@ decode_fragment(v1_thrift_binary, Content) ->
 
 %%
 
--spec append_pulse_metadata(bouncer_arbiter_pulse:metadata(), st()) ->
-    st().
+-spec append_pulse_metadata(bouncer_arbiter_pulse:metadata(), st()) -> st().
 append_pulse_metadata(Metadata, St = #st{pulse_metadata = MetadataWas}) ->
     St#st{pulse_metadata = maps:merge(MetadataWas, Metadata)}.
 
--spec handle_judgement_beat(_Beat, st()) ->
-    ok.
+-spec handle_judgement_beat(_Beat, st()) -> ok.
 handle_judgement_beat(Beat, #st{pulse = Pulse, pulse_metadata = Metadata}) ->
     bouncer_arbiter_pulse:handle_beat({judgement, Beat}, Metadata, Pulse).

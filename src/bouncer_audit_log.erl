@@ -4,6 +4,7 @@
 -export([stop/1]).
 
 -behaviour(bouncer_arbiter_pulse).
+
 -export([handle_beat/3]).
 
 -define(DEFAULT_LOG_LEVEL, notice).
@@ -54,8 +55,7 @@
 -type st() ::
     {log, logger:level()}.
 
--spec init(opts()) ->
-    bouncer_arbiter_pulse:handlers(st()).
+-spec init(opts()) -> bouncer_arbiter_pulse:handlers(st()).
 init(Opts) ->
     _ = assert_strict_opts(?OPTS, Opts),
     init_log_handler(maps:get(log, Opts, #{})).
@@ -66,7 +66,7 @@ init_log_handler(LogOpts = #{}) ->
     BackendConfig = mk_logger_backend_config(maps:get(backend, LogOpts, #{})),
     HandlerConfig0 = maps:with([formatter], LogOpts),
     HandlerConfig1 = HandlerConfig0#{
-        config  => BackendConfig,
+        config => BackendConfig,
         % NOTE
         % This two options together ensure that _only_ audit logs will flow through to the backend.
         filters => [{domain, {fun logger_filters:domain/2, {log, sub, ?LOG_DOMAIN}}}],
@@ -93,11 +93,7 @@ mk_logger_backend_config(BackendOpts) ->
     Type = validate_log_type(maps:get(type, BackendOpts, standard_io)),
     mk_logger_backend_config(Type, BackendOpts).
 
-validate_log_type(Type) when
-    Type == standard_io;
-    Type == standard_error;
-    Type == file
-->
+validate_log_type(Type) when Type == standard_io; Type == standard_error; Type == file ->
     Type;
 validate_log_type(Type) ->
     erlang:error(badarg, [Type]).
@@ -158,13 +154,11 @@ assert_strict_opts(Ks, Opts) ->
 
 %%
 
--spec stop(opts()) ->
-    ok.
+-spec stop(opts()) -> ok.
 stop(Opts = #{}) ->
     stop_log_handler(maps:get(log, Opts, #{})).
 
--spec stop_log_handler(log_opts()) ->
-    ok.
+-spec stop_log_handler(log_opts()) -> ok.
 stop_log_handler(LogOpts = #{}) ->
     Level = maps:get(level, LogOpts, ?DEFAULT_LOG_LEVEL),
     ok = log(Level, "audit log stopped", #{}),
@@ -175,11 +169,10 @@ stop_log_handler(disabled) ->
 
 %%
 
--type beat()     :: bouncer_arbiter_pulse:beat().
+-type beat() :: bouncer_arbiter_pulse:beat().
 -type metadata() :: bouncer_arbiter_pulse:metadata().
 
--spec handle_beat(beat(), metadata(), st()) ->
-    ok.
+-spec handle_beat(beat(), metadata(), st()) -> ok.
 handle_beat(Beat, Metadata, {log, Level}) ->
     log(
         get_severity(Beat, Level),
@@ -200,34 +193,35 @@ log(Severity, Message, Metadata) ->
     ok.
 
 get_severity({judgement, started}, _Level) -> debug;
-get_severity(_, Level)                     -> Level.
+get_severity(_, Level) -> Level.
 
-get_message({judgement, started})        -> <<"judgement started">>;
+get_message({judgement, started}) -> <<"judgement started">>;
 get_message({judgement, {completed, _}}) -> <<"judgement completed">>;
-get_message({judgement, {failed, _}})    -> <<"judgement failed">>.
+get_message({judgement, {failed, _}}) -> <<"judgement failed">>.
 
 get_beat_metadata({judgement, Event}) ->
     #{
-        judgement => case Event of
-            started ->
-                #{
-                    event => started
-                };
-            {completed, {Resolution, Assertions}} ->
-                encode_restrictions(Resolution, #{
-                    event => completed,
-                    resolution => encode_resolution(Resolution),
-                    assertions => lists:map(fun encode_assertion/1, Assertions)
-                });
-            {failed, Error} ->
-                #{
-                    event => failed,
-                    error => encode_error(Error)
-                }
-        end
+        judgement =>
+            case Event of
+                started ->
+                    #{
+                        event => started
+                    };
+                {completed, {Resolution, Assertions}} ->
+                    encode_restrictions(Resolution, #{
+                        event => completed,
+                        resolution => encode_resolution(Resolution),
+                        assertions => lists:map(fun encode_assertion/1, Assertions)
+                    });
+                {failed, Error} ->
+                    #{
+                        event => failed,
+                        error => encode_error(Error)
+                    }
+            end
     }.
 
-encode_resolution(allowed)   -> <<"allowed">>;
+encode_resolution(allowed) -> <<"allowed">>;
 encode_resolution(forbidden) -> <<"forbidden">>;
 encode_resolution({restricted, _Restrictions}) -> <<"restricted">>.
 
@@ -257,7 +251,7 @@ extract_metadata(Metadata, Acc) ->
 extract_opt_meta(K, Metadata, EncodeFun, Acc) ->
     case maps:find(K, Metadata) of
         {ok, V} -> Acc#{K => EncodeFun(V)};
-        error   -> Acc
+        error -> Acc
     end.
 
 encode_id(ID) when is_binary(ID) ->

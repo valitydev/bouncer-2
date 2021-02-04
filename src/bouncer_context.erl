@@ -23,17 +23,14 @@
 
 %%
 
--spec empty() ->
-    ctx().
+-spec empty() -> ctx().
 empty() ->
     #{}.
 
--spec merge(ctx(), ctx()) ->
-    {_Merged :: ctx(), _Conflicting :: ctx() | undefined}.
-
+-spec merge(ctx(), ctx()) -> {_Merged :: ctx(), _Conflicting :: ctx() | undefined}.
 merge(Ctx1, Ctx2) ->
     maps:fold(
-        fun (K, V2, {CtxAcc, ConflictAcc}) ->
+        fun(K, V2, {CtxAcc, ConflictAcc}) ->
             case maps:find(K, CtxAcc) of
                 {ok, V1} ->
                     {VM, Conflict} = merge_values(V1, V2),
@@ -54,10 +51,11 @@ merge_values(V1, V2) ->
     case ordsets:is_set(V1) and ordsets:is_set(V2) of
         true ->
             Intersection = ordsets:intersection(V1, V2),
-            MaybeConflict = case ordsets:size(Intersection) of
-                0 -> undefined;
-                _ -> Intersection
-            end,
+            MaybeConflict =
+                case ordsets:size(Intersection) of
+                    0 -> undefined;
+                    _ -> Intersection
+                end,
             {ordsets:union(V1, V2), MaybeConflict};
         false when V1 =:= V2 ->
             {V2, undefined};

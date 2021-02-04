@@ -31,6 +31,7 @@
 -export([request_timeout_means_unknown/1]).
 
 -behaviour(bouncer_arbiter_pulse).
+
 -export([handle_beat/3]).
 
 -include_lib("bouncer_proto/include/bouncer_decisions_thrift.hrl").
@@ -47,9 +48,7 @@
 -define(OPA_ENDPOINT, {?OPA_HOST, 8181}).
 -define(API_RULESET_ID, "service/authz/api").
 
--spec all() ->
-    [atom()].
-
+-spec all() -> [atom()].
 all() ->
     [
         {group, general},
@@ -57,8 +56,7 @@ all() ->
         {group, network_error_mapping}
     ].
 
--spec groups() ->
-    [{group_name(), list(), [test_case_name()]}].
+-spec groups() -> [{group_name(), list(), [test_case_name()]}].
 groups() ->
     [
         {general, [parallel], [
@@ -84,28 +82,21 @@ groups() ->
         ]}
     ].
 
--spec init_per_suite(config()) ->
-    config().
-
+-spec init_per_suite(config()) -> config().
 init_per_suite(C) ->
     Apps =
         genlib_app:start_application(woody) ++
-        genlib_app:start_application_with(scoper, [
-            {storage, scoper_storage_logger}
-        ]),
+            genlib_app:start_application_with(scoper, [
+                {storage, scoper_storage_logger}
+            ]),
     [{suite_apps, Apps} | C].
 
--spec end_per_suite(config()) ->
-    ok.
+-spec end_per_suite(config()) -> ok.
 end_per_suite(C) ->
     genlib_app:stop_unload_applications(?CONFIG(suite_apps, C)).
 
--spec init_per_group(group_name(), config()) ->
-    config().
-init_per_group(Name, C) when
-    Name == general;
-    Name == rules_authz_api
-->
+-spec init_per_group(group_name(), config()) -> config().
+init_per_group(Name, C) when Name == general; Name == rules_authz_api ->
     start_bouncer([], [{groupname, Name} | C]);
 init_per_group(Name, C) ->
     [{groupname, Name} | C].
@@ -115,24 +106,27 @@ start_bouncer(Env, C) ->
     Port = 8022,
     ArbiterPath = <<"/v1/arbiter">>,
     {ok, StashPid} = ct_stash:start(),
-    Apps = genlib_app:start_application_with(bouncer, [
-        {ip, IP},
-        {port, Port},
-        {services, #{
-            arbiter => #{
-                path  => ArbiterPath,
-                pulse => [{?MODULE, StashPid}]
-            }
-        }},
-        {transport_opts, #{
-            max_connections => 1000,
-            num_acceptors   => 4
-        }},
-        {opa, #{
-            endpoint  => ?OPA_ENDPOINT,
-            transport => tcp
-        }}
-    ] ++ Env),
+    Apps = genlib_app:start_application_with(
+        bouncer,
+        [
+            {ip, IP},
+            {port, Port},
+            {services, #{
+                arbiter => #{
+                    path => ArbiterPath,
+                    pulse => [{?MODULE, StashPid}]
+                }
+            }},
+            {transport_opts, #{
+                max_connections => 1000,
+                num_acceptors => 4
+            }},
+            {opa, #{
+                endpoint => ?OPA_ENDPOINT,
+                transport => tcp
+            }}
+        ] ++ Env
+    ),
     Services = #{
         arbiter => mk_url(IP, Port, ArbiterPath)
     },
@@ -141,34 +135,34 @@ start_bouncer(Env, C) ->
 mk_url(IP, Port, Path) ->
     iolist_to_binary(["http://", IP, ":", genlib:to_binary(Port), Path]).
 
--spec end_per_group(group_name(), config()) ->
-    _.
+-spec end_per_group(group_name(), config()) -> _.
 end_per_group(_Name, C) ->
     stop_bouncer(C).
 
 stop_bouncer(C) ->
-    ct_helper:with_config(group_apps, C,
-        fun (Apps) -> genlib_app:stop_unload_applications(Apps) end),
-    ct_helper:with_config(stash, C,
-        fun (Pid) -> ?assertEqual(ok, ct_stash:destroy(Pid)) end).
+    ct_helper:with_config(
+        group_apps,
+        C,
+        fun(Apps) -> genlib_app:stop_unload_applications(Apps) end
+    ),
+    ct_helper:with_config(
+        stash,
+        C,
+        fun(Pid) -> ?assertEqual(ok, ct_stash:destroy(Pid)) end
+    ).
 
--spec init_per_testcase(atom(), config()) ->
-    config().
-
+-spec init_per_testcase(atom(), config()) -> config().
 init_per_testcase(Name, C) ->
     [{testcase, Name} | C].
 
--spec end_per_testcase(atom(), config()) ->
-    config().
-
+-spec end_per_testcase(atom(), config()) -> config().
 end_per_testcase(_Name, _C) ->
     ok.
 
 %%
 
 -define(CONTEXT(Fragments), #bdcs_Context{fragments = Fragments}).
--define(JUDGEMENT(Resolution),
-    #bdcs_Judgement{resolution = Resolution}).
+-define(JUDGEMENT(Resolution), #bdcs_Judgement{resolution = Resolution}).
 
 -spec missing_ruleset_notfound(config()) -> ok.
 -spec incorrect_ruleset_invalid1(config()) -> ok.
@@ -198,9 +192,11 @@ incorrect_ruleset_invalid1(C) ->
         call_judge("trivial/incorrect1", ?CONTEXT(#{}), Client)
     ),
     ?assertMatch(
-        {judgement, {failed, {ruleset_invalid, [
-            {data_invalid, _, wrong_size, _, [<<"resolution">>]}
-        ]}}},
+        {judgement,
+            {failed,
+                {ruleset_invalid, [
+                    {data_invalid, _, wrong_size, _, [<<"resolution">>]}
+                ]}}},
         lists:last(flush_beats(Client, C))
     ).
 
@@ -211,9 +207,11 @@ incorrect_ruleset_invalid2(C) ->
         call_judge("trivial/incorrect2", ?CONTEXT(#{}), Client)
     ),
     ?assertMatch(
-        {judgement, {failed, {ruleset_invalid, [
-            {data_invalid, _, wrong_type, _, [<<"resolution">>, _]}
-        ]}}},
+        {judgement,
+            {failed,
+                {ruleset_invalid, [
+                    {data_invalid, _, wrong_type, _, [<<"resolution">>, _]}
+                ]}}},
         lists:last(flush_beats(Client, C))
     ).
 
@@ -224,9 +222,11 @@ incorrect_ruleset_invalid3(C) ->
         call_judge("trivial/incorrect3", ?CONTEXT(#{}), Client)
     ),
     ?assertMatch(
-        {judgement, {failed, {ruleset_invalid, [
-            {data_invalid, _, no_extra_items_allowed, [<<"forbidden">>, [#{}], #{}], _}
-        ]}}},
+        {judgement,
+            {failed,
+                {ruleset_invalid, [
+                    {data_invalid, _, no_extra_items_allowed, [<<"forbidden">>, [#{}], #{}], _}
+                ]}}},
         lists:last(flush_beats(Client, C))
     ).
 
@@ -239,9 +239,11 @@ missing_content_invalid_context(C) ->
         call_judge(?API_RULESET_ID, Context, Client)
     ),
     ?assertMatch(
-        {judgement, {failed, {malformed_context, #{
-            <<"missing">> := {v1_thrift_binary, {unexpected, _, _, _}}
-        }}}},
+        {judgement,
+            {failed,
+                {malformed_context, #{
+                    <<"missing">> := {v1_thrift_binary, {unexpected, _, _, _}}
+                }}}},
         lists:last(flush_beats(Client, C))
     ).
 
@@ -255,9 +257,11 @@ junk_content_invalid_context(C) ->
         call_judge(?API_RULESET_ID, Context, Client)
     ),
     ?assertMatch(
-        {judgement, {failed, {malformed_context, #{
-            <<"missing">> := {v1_thrift_binary, {unexpected, _, _, _}}
-        }}}},
+        {judgement,
+            {failed,
+                {malformed_context, #{
+                    <<"missing">> := {v1_thrift_binary, {unexpected, _, _, _}}
+                }}}},
         lists:last(flush_beats(Client, C))
     ).
 
@@ -265,7 +269,7 @@ conflicting_context_invalid(C) ->
     Client = mk_client(C),
     Fragment1 = #{
         user => #{
-            id    => <<"joeblow">>,
+            id => <<"joeblow">>,
             email => Email1 = <<"deadinside69@example.org">>
         },
         requester => #{
@@ -274,7 +278,7 @@ conflicting_context_invalid(C) ->
     },
     Fragment2 = #{
         user => #{
-            id    => <<"joeblow">>,
+            id => <<"joeblow">>,
             email => <<"deadinside420@example.org">>
         },
         requester => #{
@@ -290,9 +294,11 @@ conflicting_context_invalid(C) ->
         call_judge(?API_RULESET_ID, Context, Client)
     ),
     ?assertEqual(
-        {judgement, {failed, {conflicting_context, #{
-            <<"frag2">> => #{user => #{email => Email1}}
-        }}}},
+        {judgement,
+            {failed,
+                {conflicting_context, #{
+                    <<"frag2">> => #{user => #{email => Email1}}
+                }}}},
         lists:last(flush_beats(Client, C))
     ).
 
@@ -300,7 +306,7 @@ distinct_sets_context_valid(C) ->
     Client = mk_client(C),
     Fragment1 = #{
         user => #{
-            id   => <<"joeblow">>,
+            id => <<"joeblow">>,
             orgs => mk_ordset([
                 #{
                     id => <<"hoolie">>,
@@ -315,7 +321,7 @@ distinct_sets_context_valid(C) ->
     },
     Fragment2 = #{
         user => #{
-            id   => <<"joeblow">>,
+            id => <<"joeblow">>,
             orgs => mk_ordset([
                 #{
                     id => <<"hoolie">>,
@@ -354,11 +360,18 @@ restricted_search_invoices_shop_manager(C) ->
         mk_auth_session_token(),
         mk_env(),
         mk_op_search_invoices(mk_ordset([#{id => <<"SHOP">>}]), <<"PARTY">>),
-        mk_user(<<"USER">>, mk_ordset([
-            mk_user_org(<<"PARTY">>, <<"OWNER">>, mk_ordset([
-                mk_role(<<"Manager">>, <<"SHOP">>)
-            ]))
-        ]))
+        mk_user(
+            <<"USER">>,
+            mk_ordset([
+                mk_user_org(
+                    <<"PARTY">>,
+                    <<"OWNER">>,
+                    mk_ordset([
+                        mk_role(<<"Manager">>, <<"SHOP">>)
+                    ])
+                )
+            ])
+        )
     ]),
     Context = ?CONTEXT(#{<<"root">> => mk_ctx_v1_fragment(Fragment)}),
     ?assertMatch(
@@ -375,8 +388,9 @@ forbidden_expired(C) ->
     % Would be funny if this fails on some system too deep in the past.
     Fragment = maps:merge(mk_env(), #{
         auth => #{
-            method     => <<"AccessToken">>,
-            expiration => <<"1991-12-26T17:00:00Z">> % ☭😢
+            method => <<"AccessToken">>,
+            % ☭😢
+            expiration => <<"1991-12-26T17:00:00Z">>
         }
     }),
     Context = ?CONTEXT(#{<<"root">> => mk_ctx_v1_fragment(Fragment)}),
@@ -429,10 +443,12 @@ forbidden_w_empty_context(C) ->
     ).
 
 mk_user(UserID, UserOrgs) ->
-    #{user => #{
-        id   => UserID,
-        orgs => UserOrgs
-    }}.
+    #{
+        user => #{
+            id => UserID,
+            orgs => UserOrgs
+        }
+    }.
 
 mk_user_org(OrgID, OwnerID, Roles) ->
     #{
@@ -448,24 +464,30 @@ mk_auth_session_token() ->
     mk_auth_session_token(erlang:system_time(second) + 3600).
 
 mk_auth_session_token(ExpiresAt) ->
-    #{auth => #{
-        method     => <<"SessionToken">>,
-        expiration => format_ts(ExpiresAt, second)
-    }}.
+    #{
+        auth => #{
+            method => <<"SessionToken">>,
+            expiration => format_ts(ExpiresAt, second)
+        }
+    }.
 
 mk_op_search_invoices(Shops, PartyID) ->
-    #{anapi => #{
-        op => #{
-            id      => <<"SearchInvoices">>,
-            shops   => Shops,
-            party   => #{id => PartyID}
+    #{
+        anapi => #{
+            op => #{
+                id => <<"SearchInvoices">>,
+                shops => Shops,
+                party => #{id => PartyID}
+            }
         }
-    }}.
+    }.
 
 mk_env() ->
-    #{env => #{
-        now => format_now()
-    }}.
+    #{
+        env => #{
+            now => format_now()
+        }
+    }.
 
 format_now() ->
     USec = erlang:system_time(second),
@@ -482,11 +504,16 @@ format_ts(Ts, Unit) ->
 -spec request_timeout_means_unknown(config()) -> ok.
 
 connect_failed_means_unavailable(C) ->
-    C1 = start_bouncer([{opa, #{
-        endpoint => {?OPA_HOST, 65535},
-        transport => tcp,
-        event_handler => {ct_gun_event_h, []}
-    }}], C),
+    C1 = start_bouncer(
+        [
+            {opa, #{
+                endpoint => {?OPA_HOST, 65535},
+                transport => tcp,
+                event_handler => {ct_gun_event_h, []}
+            }}
+        ],
+        C
+    ),
     Client = mk_client(C1),
     try
         ?assertError(
@@ -550,16 +577,24 @@ request_timeout_means_unknown(C) ->
     end.
 
 start_proxy_bouncer(Proxy, C) ->
-    start_bouncer([{opa, #{
-        endpoint => ct_proxy:endpoint(Proxy),
-        transport => tcp,
-        event_handler => {ct_gun_event_h, []}
-    }}], C).
+    start_bouncer(
+        [
+            {opa, #{
+                endpoint => ct_proxy:endpoint(Proxy),
+                transport => tcp,
+                event_handler => {ct_gun_event_h, []}
+            }}
+        ],
+        C
+    ).
 
 change_proxy_mode(Proxy, Scope, Mode, C) ->
     ModeWas = ct_proxy:mode(Proxy, Scope, Mode),
-    _ = ct:pal(debug, "[~p] set proxy ~p from '~p' to '~p'",
-        [?CONFIG(testcase, C), Scope, ModeWas, Mode]),
+    _ = ct:pal(
+        debug,
+        "[~p] set proxy ~p from '~p' to '~p'",
+        [?CONFIG(testcase, C), Scope, ModeWas, Mode]
+    ),
     ok.
 
 %%
@@ -599,8 +634,7 @@ get_service_spec(arbiter) ->
 
 %%
 
--spec handle_beat(bouncer_arbiter_pulse:beat(), bouncer_arbiter_pulse:metadata(), pid()) ->
-    ok.
+-spec handle_beat(bouncer_arbiter_pulse:beat(), bouncer_arbiter_pulse:metadata(), pid()) -> ok.
 handle_beat(Beat, Metadata, StashPid) ->
     _ = stash_beat(Beat, Metadata, StashPid),
     ct:pal("~p [arbiter] ~0p:~nmetadata=~p", [self(), Beat, Metadata]).

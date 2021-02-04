@@ -14,9 +14,9 @@
 %% ```
 -type ruleset_id() :: iodata().
 
--type judgement()  :: {resolution(), [assertion()]}.
+-type judgement() :: {resolution(), [assertion()]}.
 -type resolution() :: allowed | forbidden | {restricted, map()}.
--type assertion()  :: {_Code :: binary(), _Details :: #{binary() => _}}.
+-type assertion() :: {_Code :: binary(), _Details :: #{binary() => _}}.
 
 -export_type([judgement/0]).
 -export_type([resolution/0]).
@@ -26,12 +26,11 @@
 %%
 
 -spec judge(ruleset_id(), bouncer_context:ctx()) ->
-    {ok, judgement()} |
-    {error,
-        ruleset_notfound |
-        {ruleset_invalid, _Details} |
-        {unavailable | unknown, _Reason}
-    }.
+    {ok, judgement()}
+    | {error,
+        ruleset_notfound
+        | {ruleset_invalid, _Details}
+        | {unavailable | unknown, _Reason}}.
 judge(RulesetID, Context) ->
     case mk_opa_client() of
         {ok, Client} ->
@@ -48,8 +47,7 @@ judge(RulesetID, Context) ->
             Error
     end.
 
--spec infer_judgement(document()) ->
-    {ok, judgement()} | {error, {ruleset_invalid, _Details}}.
+-spec infer_judgement(document()) -> {ok, judgement()} | {error, {ruleset_invalid, _Details}}.
 infer_judgement(Document) ->
     case jesse:validate_with_schema(get_judgement_schema(), Document) of
         {ok, _} ->
@@ -74,8 +72,7 @@ extract_assertions(Assertions) ->
 extract_assertion(Assertion = #{<<"code">> := Code}) ->
     {Code, maps:without([<<"code">>], Assertion)}.
 
--spec get_judgement_schema() ->
-    jesse:schema().
+-spec get_judgement_schema() -> jesse:schema().
 get_judgement_schema() ->
     % TODO
     % Worth declaring in a separate file? Should be helpful w/ CI-like activities.
@@ -121,37 +118,36 @@ get_judgement_schema() ->
 
 -type endpoint() :: {inet:hostname() | inet:ip_address(), inet:port_number()}.
 -type client_opts() :: #{
-    endpoint              := endpoint(),
-    transport             => tcp | tls,
-    tcp_opts              => [gen_tcp:connect_option()],
-    tls_opts              => [ssl:tls_client_option()],
-    connect_timeout       => timeout(),
+    endpoint := endpoint(),
+    transport => tcp | tls,
+    tcp_opts => [gen_tcp:connect_option()],
+    tls_opts => [ssl:tls_client_option()],
+    connect_timeout => timeout(),
     domain_lookup_timeout => timeout(),
-    request_timeout       => timeout(),
-    http_opts             => gun:http_opts(),
-    http2_opts            => gun:http2_opts(),
+    request_timeout => timeout(),
+    http_opts => gun:http_opts(),
+    http2_opts => gun:http2_opts(),
     % TODO
     % Pulse over gun event handler mechanic.
-    event_handler         => {module(), _State}
+    event_handler => {module(), _State}
 }.
 
 -define(DEFAULT_CLIENT_OPTS, #{
     domain_lookup_timeout => 1000,
-    connect_timeout       => 1000,
-    request_timeout       => 1000
+    connect_timeout => 1000,
+    request_timeout => 1000
 }).
 
 -type client() :: {pid(), client_opts()}.
 -type document() ::
-    null |
-    binary() |
-    number() |
-    boolean() |
-    #{atom() | binary() => document()} |
-    [document()].
+    null
+    | binary()
+    | number()
+    | boolean()
+    | #{atom() | binary() => document()}
+    | [document()].
 
--spec mk_opa_client() ->
-    {ok, client()} | {error, {unavailable, _Reason}}.
+-spec mk_opa_client() -> {ok, client()} | {error, {unavailable, _Reason}}.
 mk_opa_client() ->
     Opts = get_opa_client_opts(),
     {Host, Port} = maps:get(endpoint, Opts),
@@ -186,11 +182,10 @@ mk_opa_client() ->
     end.
 
 -spec request_opa_document(_ID :: iodata(), _Input :: document(), client()) ->
-    {ok, document()} |
-    {error,
-        notfound |
-        {unknown, _Reason}
-    }.
+    {ok, document()}
+    | {error,
+        notfound
+        | {unknown, _Reason}}.
 request_opa_document(ID, Input, {Client, Opts}) ->
     Path = join_path(<<"/v1/data">>, ID),
     % TODO
@@ -200,11 +195,12 @@ request_opa_document(ID, Input, {Client, Opts}) ->
     CType = <<"application/json; charset=utf-8">>,
     Headers = #{
         <<"content-type">> => CType,
-        <<"accept">>       => CType
+        <<"accept">> => CType
     },
     Timeout = maps:get(request_timeout, Opts),
     StreamRef = gun:post(Client, Path, Headers, Body),
-    Deadline = erlang:monotonic_time(millisecond) + Timeout, % TODO think about implications
+    % TODO think about implications
+    Deadline = erlang:monotonic_time(millisecond) + Timeout,
     case gun:await(Client, StreamRef, Timeout) of
         {response, nofin, 200, _Headers} ->
             TimeoutLeft = Deadline - erlang:monotonic_time(millisecond),
@@ -222,8 +218,7 @@ request_opa_document(ID, Input, {Client, Opts}) ->
             {error, {unknown, Reason}}
     end.
 
--spec decode_document(binary()) ->
-    {ok, document()} | {error, notfound}.
+-spec decode_document(binary()) -> {ok, document()} | {error, notfound}.
 decode_document(Response) ->
     case jsx:decode(Response) of
         #{<<"result">> := Result} ->
@@ -232,8 +227,7 @@ decode_document(Response) ->
             {error, notfound}
     end.
 
--spec get_opa_client_opts() ->
-    client_opts().
+-spec get_opa_client_opts() -> client_opts().
 get_opa_client_opts() ->
     maps:merge(
         ?DEFAULT_CLIENT_OPTS,
@@ -249,7 +243,7 @@ normalize_path(P = <<$/, P1/binary>>) ->
     S1 = byte_size(P1),
     case S1 > 0 andalso binary:last(P1) of
         $/ -> binary:part(P, 0, S1);
-        _  -> P
+        _ -> P
     end;
 normalize_path(P) when is_binary(P) ->
     normalize_path(<<$/, P/binary>>);

@@ -19,7 +19,7 @@ BASE_IMAGE_TAG := 688cee70c0eb6540709fe35b816c81a90dc542ea
 BUILD_IMAGE_TAG := 917afcdd0c0a07bf4155d597bbba72e962e1a34a
 CALL_ANYWHERE := \
 	submodules \
-	all compile xref lint dialyze cover release clean distclean
+	all compile xref lint format check_format dialyze cover release clean distclean
 
 CALL_W_CONTAINER := $(CALL_ANYWHERE) test
 
@@ -44,6 +44,12 @@ xref:
 
 lint:
 	$(REBAR) lint
+
+check_format:
+	$(REBAR) fmt -c
+
+format:
+	$(REBAR) fmt -w
 
 dialyze:
 	$(REBAR) dialyzer

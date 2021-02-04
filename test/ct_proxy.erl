@@ -11,6 +11,7 @@
 %%
 
 -behaviour(gen_server).
+
 -export([
     init/1,
     handle_call/3,
@@ -25,23 +26,19 @@
 -include_lib("kernel/include/inet.hrl").
 
 -type endpoint() :: {inet:hostname(), inet:port_number()}.
--type scope()    :: listen | connection.
--type mode()     :: ignore | stop | relay.
--type modes()    :: #{scope() => mode()}.
+-type scope() :: listen | connection.
+-type mode() :: ignore | stop | relay.
+-type modes() :: #{scope() => mode()}.
 
 -type proxy() :: pid().
 
--spec start_link(endpoint()) ->
-    {ok, proxy()}.
+-spec start_link(endpoint()) -> {ok, proxy()}.
 
--spec start_link(endpoint(), modes()) ->
-    {ok, proxy()}.
+-spec start_link(endpoint(), modes()) -> {ok, proxy()}.
 
--spec start_link(endpoint(), modes(), ranch_tcp:opts()) ->
-    {ok, proxy()}.
+-spec start_link(endpoint(), modes(), ranch_tcp:opts()) -> {ok, proxy()}.
 
--spec unlink(proxy()) ->
-    proxy().
+-spec unlink(proxy()) -> proxy().
 
 start_link(Upstream) ->
     start_link(Upstream, #{}).
@@ -61,44 +58,35 @@ unlink(Proxy) when is_pid(Proxy) ->
     true = erlang:unlink(Proxy),
     Proxy.
 
--spec endpoint(proxy()) ->
-    endpoint().
+-spec endpoint(proxy()) -> endpoint().
 endpoint(Proxy) when is_pid(Proxy) ->
     gen_server:call(Proxy, endpoint).
 
--spec mode(proxy(), scope()) ->
-    {mode(), _Upstream :: endpoint()}.
-
+-spec mode(proxy(), scope()) -> {mode(), _Upstream :: endpoint()}.
 mode(Proxy, Scope) when is_pid(Proxy) ->
     gen_server:call(Proxy, {mode, Scope}).
 
--spec mode(proxy(), scope(), mode()) ->
-    mode().
-
+-spec mode(proxy(), scope(), mode()) -> mode().
 mode(Proxy, Scope, Mode) when is_pid(Proxy) ->
     gen_server:call(Proxy, {mode, Scope, Mode}).
 
--spec stop(proxy()) ->
-    ok.
-
+-spec stop(proxy()) -> ok.
 stop(Proxy) when is_pid(Proxy) ->
     proc_lib:stop(Proxy, shutdown).
 
 %%
 
 -record(st, {
-    lsock     :: _Socket | undefined,
+    lsock :: _Socket | undefined,
     lsockopts :: list(),
-    acceptor  :: pid() | undefined,
-    modes     :: #{scope() => mode()},
-    upstream  :: {inet:ip_address(), inet:port_number()}
+    acceptor :: pid() | undefined,
+    modes :: #{scope() => mode()},
+    upstream :: {inet:ip_address(), inet:port_number()}
 }).
 
 -type st() :: #st{}.
 
--spec init(_) ->
-    {ok, st()}.
-
+-spec init(_) -> {ok, st()}.
 init({Upstream, Modes0, SocketOpts}) ->
     Modes = maps:merge(#{listen => relay, connection => relay}, Modes0),
     St = #st{
@@ -108,9 +96,7 @@ init({Upstream, Modes0, SocketOpts}) ->
     },
     {ok, sync_mode(listen, stop, maps:get(listen, Modes), St)}.
 
--spec handle_call(_Call, _From, st()) ->
-    {noreply, st()}.
-
+-spec handle_call(_Call, _From, st()) -> {noreply, st()}.
 handle_call(endpoint, _From, St = #st{}) ->
     {reply, get_endpoint(St), St};
 handle_call({mode, Scope, Mode}, _From, St = #st{modes = Modes}) ->
@@ -122,27 +108,19 @@ handle_call({mode, Scope}, _From, St = #st{modes = Modes, upstream = Endpoint}) 
 handle_call(_Call, _From, St) ->
     {noreply, St}.
 
--spec handle_cast(_Cast, st()) ->
-    {noreply, st()}.
-
+-spec handle_cast(_Cast, st()) -> {noreply, st()}.
 handle_cast(_Cast, St) ->
     {noreply, St}.
 
--spec handle_info(_Info, st()) ->
-    {noreply, st()}.
-
+-spec handle_info(_Info, st()) -> {noreply, st()}.
 handle_info(_Info, St) ->
     {noreply, St}.
 
--spec terminate(_Reason, st()) ->
-    _.
-
+-spec terminate(_Reason, st()) -> _.
 terminate(_Reason, _St) ->
     ok.
 
--spec code_change(_Vsn | {down, _Vsn}, st(), _Extra) ->
-    {ok, st()}.
-
+-spec code_change(_Vsn | {down, _Vsn}, st(), _Extra) -> {ok, st()}.
 code_change(_Vsn, St, _Extra) ->
     {ok, St}.
 
@@ -190,7 +168,7 @@ stop_listener(St = #st{lsock = LSock}) when lsock /= undefined ->
 start_acceptor(St = #st{acceptor = undefined, lsock = LSock}) ->
     ct:pal("start_acceptor @ ~p", [St]),
     Parent = self(),
-    Pid = erlang:spawn_link(fun () -> loop_acceptor(Parent, LSock) end),
+    Pid = erlang:spawn_link(fun() -> loop_acceptor(Parent, LSock) end),
     St#st{acceptor = Pid}.
 
 stop_acceptor(St = #st{acceptor = Pid}) when is_pid(Pid) ->
@@ -198,19 +176,21 @@ stop_acceptor(St = #st{acceptor = Pid}) when is_pid(Pid) ->
     MRef = erlang:monitor(process, Pid),
     true = erlang:unlink(Pid),
     true = erlang:exit(Pid, shutdown),
-    receive {'DOWN', MRef, process, Pid, _Reason} ->
-        St#st{acceptor = undefined}
+    receive
+        {'DOWN', MRef, process, Pid, _Reason} ->
+            St#st{acceptor = undefined}
     end.
 
 loop_acceptor(Parent, LSock) ->
-    _ = case ranch_tcp:accept(LSock, infinity) of
-        {ok, CSock} ->
-            _ = ct:pal("accepted ~p from ~p", [CSock, ranch_tcp:peername(CSock)]),
-            _ = spawn_proxy_connection(Parent, CSock),
-            loop_acceptor(Parent, LSock);
-        {error, Reason} ->
-            exit(Reason)
-    end.
+    _ =
+        case ranch_tcp:accept(LSock, infinity) of
+            {ok, CSock} ->
+                _ = ct:pal("accepted ~p from ~p", [CSock, ranch_tcp:peername(CSock)]),
+                _ = spawn_proxy_connection(Parent, CSock),
+                loop_acceptor(Parent, LSock);
+            {error, Reason} ->
+                exit(Reason)
+        end.
 
 %%
 
@@ -228,7 +208,7 @@ loop_acceptor(Parent, LSock) ->
 
 spawn_proxy_connection(Parent, CSock) ->
     ProxySt = #proxy{insock = CSock, parent = Parent},
-    erlang:spawn_link(fun () -> loop_proxy_connection(ProxySt) end).
+    erlang:spawn_link(fun() -> loop_proxy_connection(ProxySt) end).
 
 loop_proxy_connection(St = #proxy{insock = InSock, parent = Parent, buffer = Buffer}) ->
     case ranch_tcp:recv(InSock, 0, ?PROXY_RECV_TIMEOUT) of
@@ -241,7 +221,7 @@ loop_proxy_connection(St = #proxy{insock = InSock, parent = Parent, buffer = Buf
                 ignore ->
                     loop_proxy_connection(St);
                 relay ->
-                    loop_proxy_relay(St#proxy{buffer  = Buffer1, upstream = Endpoint})
+                    loop_proxy_relay(St#proxy{buffer = Buffer1, upstream = Endpoint})
             end;
         _ ->
             terminate(St)
