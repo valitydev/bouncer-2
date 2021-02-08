@@ -264,9 +264,10 @@ encode_context(Context = #{}) ->
     Context.
 
 encode_fragments(Fragments = #{}) ->
-    % TODO
-    % See above.
-    Fragments.
+    maps:map(fun encode_fragment/2, Fragments).
+
+encode_fragment(_ID, Fragment) ->
+    maps:with([type, metadata], Fragment).
 
 extract_woody_ctx(WoodyCtx = #{rpc_id := RpcID}, Acc) ->
     extract_woody_meta(WoodyCtx, extract_woody_rpc_id(RpcID, Acc));
@@ -276,7 +277,13 @@ extract_woody_ctx(undefined, Acc) ->
 extract_woody_rpc_id(RpcID = #{span_id := _, trace_id := _, parent_id := _}, Acc) ->
     maps:merge(Acc, RpcID).
 
-extract_woody_meta(#{meta := Meta}, Acc) when map_size(Meta) > 0 ->
-    Acc#{woody => #{metadata => Meta}};
+%% TODO
+%% This currently duplicates scoper-related metadata in every audit log
+%% message. However, scoper is not a must, so we should probably allow
+%% to turn this thing on and off through options.
+%%
+%% extract_woody_meta(#{meta := Meta}, Acc) when map_size(Meta) > 0 ->
+%%     Acc#{woody => #{metadata => Meta}};
+%%     Acc;
 extract_woody_meta(#{}, Acc) ->
     Acc.
