@@ -7,6 +7,8 @@
 
 -export([handle_beat/3]).
 
+-define(HANDLER_ID, ?MODULE).
+
 -define(DEFAULT_LOG_LEVEL, notice).
 -define(DEFAULT_FLUSH_QLEN, 10000).
 -define(LOG_DOMAIN, [audit]).
@@ -36,7 +38,9 @@
     type => standard_io | standard_error | file,
     % Log file location. No default, MUST be set if `type` is `file`.
     file => file:filename(),
+    % How often to force fsync on log file, in ms? Defaults to 1000.
     % http://erlang.org/doc/man/logger_std_h.html
+    filesync_repeat_interval => pos_integer() | no_repeat,
     max_no_bytes => pos_integer() | infinity,
     max_no_files => non_neg_integer(),
     % Maximum number of events to queue for writing. Defaults to 10000.
@@ -46,7 +50,14 @@
 
 % NOTE
 % Keep in sync with `logger_backend_opts()`.
--define(LOGGER_BACKEND_OPTS, [type, file, max_no_bytes, max_no_files, flush_qlen]).
+-define(LOGGER_BACKEND_OPTS, [
+    type,
+    file,
+    filesync_repeat_interval,
+    max_no_bytes,
+    max_no_files,
+    flush_qlen
+]).
 
 -export_type([opts/0]).
 
@@ -73,7 +84,7 @@ init_log_handler(LogOpts = #{}) ->
         filter_default => stop
     },
     ok = logger:add_handler(
-        ?MODULE,
+        ?HANDLER_ID,
         logger_std_h,
         HandlerConfig1
     ),
@@ -129,8 +140,8 @@ get_default_backend_config(_Type, Opts) ->
 get_default_backend_config(Opts) ->
     FlushQLen = maps:get(flush_qlen, Opts, ?DEFAULT_FLUSH_QLEN),
     #{
-        % No need to set it up here since we'll sync on EVERY write by ourself.
-        filesync_repeat_interval => no_repeat,
+        % Decreased to a more safe default.
+        filesync_repeat_interval => 1000,
 
         % http://erlang.org/doc/apps/kernel/logger_chapter.html#message-queue-length
         sync_mode_qlen => 0,
@@ -189,8 +200,11 @@ log(Severity, Message, Metadata) ->
     % Matching on `ok` here is crucial. Logger may decide to flush the queue behind the scenes so
     % we need to ensure it's not happening.
     ok = logger:log(Severity, Message, maps:merge(Metadata, DefaultMetadata)),
-    ok = logger_std_h:filesync(?MODULE),
+    true = is_handler_alive(),
     ok.
+
+is_handler_alive() ->
+    lists:member(?HANDLER_ID, logger:get_handler_ids()).
 
 get_severity({judgement, started}, _Level) -> debug;
 get_severity(_, Level) -> Level.
