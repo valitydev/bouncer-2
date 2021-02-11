@@ -173,15 +173,20 @@ write_error_fails_request(C) ->
     end.
 
 write_queue_overload_fails_request(C) ->
-    QLen = 10,
-    Concurrency = QLen * 10,
+    QLen = 5,
+    Concurrency = QLen * 20,
     Dirname = mk_temp_dir(?CONFIG(testcase, C)),
     Filename = filename:join(Dirname, "audit.log"),
     C1 = start_bouncer(
         [
             {audit, #{
                 log => #{
-                    backend => #{type => file, file => Filename, flush_qlen => QLen},
+                    backend => #{
+                        type => file,
+                        file => Filename,
+                        filesync_repeat_interval => 0,
+                        flush_qlen => QLen
+                    },
                     formatter => {logger_logstash_formatter, #{single_line => true}}
                 }
             }}
