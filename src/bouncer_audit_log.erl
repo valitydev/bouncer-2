@@ -192,19 +192,18 @@ handle_beat(Beat, Metadata, {log, Level}) ->
     ).
 
 log(Severity, Message, Metadata) ->
-    DefaultMetadata = #{
-        type => audit,
-        domain => ?LOG_DOMAIN
-    },
     % NOTE
-    % Matching on `ok` here is crucial. Logger may decide to flush the queue behind the scenes so
-    % we need to ensure it's not happening.
-    ok = logger:log(Severity, Message, maps:merge(Metadata, DefaultMetadata)),
-    true = is_handler_alive(),
-    ok.
+    % Logger often decides to handle events asynchronously, even when explicitly told not to do so,
+    % with `sync_mode_qlen` set to 0. That's why we can't rely on simply matching `ok` here. We
+    % need to synchronise with underlying handler process through the `logger_olp` module interface.
+    % Important to note also that these are IMPLEMENTATION DETAILS and are SUBJECT TO CHANGE, so
+    % please take care when upgrading to newer OTP releases.
+    ok = logger:log(Severity, Message, add_default_metadata(Metadata)),
+    {ok, #{config := #{olp := Olp}}} = logger_config:get(logger, ?HANDLER_ID),
+    ok = logger_olp:reset(Olp).
 
-is_handler_alive() ->
-    lists:member(?HANDLER_ID, logger:get_handler_ids()).
+add_default_metadata(Meta0) ->
+    Meta0#{type => audit, domain => ?LOG_DOMAIN}.
 
 get_severity({judgement, started}, _Level) -> debug;
 get_severity(_, Level) -> Level.
