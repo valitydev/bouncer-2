@@ -88,13 +88,7 @@ mk_logger_backend_config(BackendOpts) ->
         tune_backend_config(maps:without(Common, BackendOpts))
     ),
     maps:merge(
-        maps:merge(
-            #{
-                % Decreased to a more safe default.
-                filesync_repeat_interval => 1000
-            },
-            CommonOpts
-        ),
+        CommonOpts,
         BackendConfig
     ).
 
