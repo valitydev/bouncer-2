@@ -4,6 +4,7 @@
 -include_lib("stdlib/include/assert.hrl").
 
 -export([all/0]).
+-export([groups/0]).
 -export([init_per_suite/1]).
 -export([end_per_suite/1]).
 -export([init_per_testcase/2]).
@@ -12,7 +13,7 @@
 -export([invalid_config_fails_start/1]).
 -export([unrecognized_config_fails_start/1]).
 -export([write_error_fails_request/1]).
--export([write_queue_overload_fails_request/1]).
+-export([write_queue_contention/1]).
 
 -include_lib("bouncer_proto/include/bouncer_decisions_thrift.hrl").
 
@@ -27,18 +28,21 @@
 -define(OPA_ENDPOINT, {?OPA_HOST, 8181}).
 -define(API_RULESET_ID, "service/authz/api").
 
--spec all() -> [atom()].
+-spec all() -> [ct_suite:ct_test_def()].
 all() ->
     [
         invalid_config_fails_start,
         unrecognized_config_fails_start,
-        write_error_fails_request
-        % TODO
-        % This testcase is currently failing consistently.
-        % Turns out logger (as of Erlang/OTP 23 w/ kernel 7.0) doesn't tell callers when specific
-        % handler loses an event due to queue flushing, even though doc says it should have.
-        % Best bet is to max out `flush_qlen` option in the meantime.
-        % write_queue_overload_fails_request
+        {group, write_error_fails_request},
+        write_queue_contention
+    ].
+
+-spec groups() -> [ct_suite:ct_group_def()].
+groups() ->
+    [
+        {write_error_fails_request, [], [
+            {testcase, write_error_fails_request, [{repeat, 10}]}
+        ]}
     ].
 
 -spec init_per_suite(config()) -> config().
@@ -69,7 +73,7 @@ end_per_testcase(_Name, _C) ->
 -spec invalid_config_fails_start(config()) -> ok.
 -spec unrecognized_config_fails_start(config()) -> ok.
 -spec write_error_fails_request(config()) -> ok.
--spec write_queue_overload_fails_request(config()) -> ok.
+-spec write_queue_contention(config()) -> ok.
 
 invalid_config_fails_start(C) ->
     ?assertError(
@@ -104,15 +108,6 @@ invalid_config_fails_start(C) ->
     ).
 
 unrecognized_config_fails_start(C) ->
-    ?assertError(
-        {bouncer, {{{unrecognized_opts, #{blarg := _}}, _Stacktrace}, _}},
-        start_stop_bouncer(
-            [
-                {audit, #{blarg => blorg}}
-            ],
-            C
-        )
-    ),
     ?assertError(
         {bouncer, {{{unrecognized_opts, #{blarg := _}}, _Stacktrace}, _}},
         start_stop_bouncer(
@@ -164,7 +159,10 @@ write_error_fails_request(C) ->
         ok = file:delete(Filename),
         ok = file:change_mode(Dirname, 8#555),
         ?assertError(
-            {woody_error, {external, result_unexpected, _}},
+            % NOTE
+            % The `_Reason` here may be either `result_unexpected` or `result_unknown`, depending
+            % on how fast application master is to stop the bouncer app.
+            {woody_error, {external, _Reason, _}},
             call_judge(?API_RULESET_ID, ?CONTEXT(#{}), Client)
         )
     after
@@ -172,9 +170,8 @@ write_error_fails_request(C) ->
         stop_bouncer(C1)
     end.
 
-write_queue_overload_fails_request(C) ->
-    QLen = 5,
-    Concurrency = QLen * 20,
+write_queue_contention(C) ->
+    Concurrency = 500,
     Dirname = mk_temp_dir(?CONFIG(testcase, C)),
     Filename = filename:join(Dirname, "audit.log"),
     C1 = start_bouncer(
@@ -184,8 +181,7 @@ write_queue_overload_fails_request(C) ->
                     backend => #{
                         type => file,
                         file => Filename,
-                        filesync_repeat_interval => 0,
-                        flush_qlen => QLen
+                        filesync_repeat_interval => 0
                     },
                     formatter => {logger_logstash_formatter, #{single_line => true}}
                 }
@@ -204,9 +200,13 @@ write_queue_overload_fails_request(C) ->
     try
         {Succeeded, _Failed} = lists:partition(fun({R, _}) -> R == ok end, Results),
         {ok, LogfileContents} = file:read_file(Filename),
-        % TODO kinda hacky
-        NumLogEvents = binary:matches(LogfileContents, <<"\"type\":\"audit\"">>),
-        ?assertEqual(length(Succeeded), length(NumLogEvents))
+        LogfileLines = [string:trim(L) || L <- string:split(LogfileContents, "\n", all)],
+        LogfileEvents = [jsx:decode(L) || L <- LogfileLines, byte_size(L) > 0],
+        CompletedEvents = [
+            Event
+            || Event = #{<<"judgement">> := #{<<"event">> := <<"completed">>}} <- LogfileEvents
+        ],
+        ?assertEqual(length(Succeeded), length(CompletedEvents))
     after
         rm_temp_dir(Dirname)
     end.
