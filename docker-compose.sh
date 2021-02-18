@@ -1,6 +1,6 @@
 #!/bin/bash
 
-OPA_VSN="0.23.2-debug"
+OPA_VSN="0.26.0-debug"
 OPA_IMAGE="openpolicyagent/opa:${OPA_VSN}"
 
 POLICY_DIR="/var/opa/policies"
