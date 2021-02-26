@@ -64,10 +64,13 @@ end_per_suite(C) ->
 
 -spec init_per_testcase(testcase_name(), config()) -> config().
 init_per_testcase(Name, C) ->
-    [{testcase, Name} | C].
+    Dirname = mk_temp_dir(Name),
+    Filename = filename:join(Dirname, "audit.log"),
+    [{testcase, Name}, {tempdir, Dirname}, {filename, Filename} | C].
 
 -spec end_per_testcase(testcase_name(), config()) -> config().
-end_per_testcase(_Name, _C) ->
+end_per_testcase(_Name, C) ->
+    _ = rm_temp_dir(?CONFIG(tempdir, C)),
     ok.
 
 %%
@@ -147,8 +150,8 @@ start_stop_bouncer(Env, C) ->
     stop_bouncer(start_bouncer(Env, C)).
 
 write_error_fails_request(C) ->
-    Dirname = mk_temp_dir(?CONFIG(testcase, C)),
-    Filename = filename:join(Dirname, "audit.log"),
+    Dirname = ?CONFIG(tempdir, C),
+    Filename = ?CONFIG(filename, C),
     C1 = start_bouncer(
         [
             {audit, #{
@@ -171,14 +174,12 @@ write_error_fails_request(C) ->
             call_judge(?API_RULESET_ID, ?CONTEXT(#{}), Client)
         )
     after
-        _ = rm_temp_dir(Dirname),
         stop_bouncer(C1)
     end.
 
 write_queue_contention(C) ->
     Concurrency = 500,
-    Dirname = mk_temp_dir(?CONFIG(testcase, C)),
-    Filename = filename:join(Dirname, "audit.log"),
+    Filename = ?CONFIG(filename, C),
     C1 = start_bouncer(
         [
             {audit, #{
@@ -202,17 +203,12 @@ write_queue_contention(C) ->
         lists:seq(1, Concurrency)
     ),
     _ = stop_bouncer(C1),
-    try
-        {Succeeded, _Failed} = lists:partition(fun({R, _}) -> R == ok end, Results),
-        CompletedEvents = grab_completed_events(Filename),
-        ?assertEqual(length(Succeeded), length(CompletedEvents))
-    after
-        rm_temp_dir(Dirname)
-    end.
+    {Succeeded, _Failed} = lists:partition(fun({R, _}) -> R == ok end, Results),
+    CompletedEvents = grab_completed_events(Filename),
+    ?assertEqual(length(Succeeded), length(CompletedEvents)).
 
 json_context_logs_ok(C) ->
-    Dirname = mk_temp_dir(?CONFIG(testcase, C)),
-    Filename = filename:join(Dirname, "audit.log"),
+    Filename = ?CONFIG(filename, C),
     C1 = start_bouncer(
         [
             {audit, #{
@@ -235,15 +231,11 @@ json_context_logs_ok(C) ->
         call_judge(?API_RULESET_ID, Context, Client)
     ),
     _ = stop_bouncer(C1),
-    try
-        Events = grab_completed_events(Filename),
-        ?assertMatch(
-            [#{<<"context">> := #{<<"capi">> := #{<<"op">> := #{<<"params">> := Params}}}}],
-            Events
-        )
-    after
-        _ = rm_temp_dir(Dirname)
-    end.
+    Events = grab_completed_events(Filename),
+    ?assertMatch(
+        [#{<<"context">> := #{<<"capi">> := #{<<"op">> := #{<<"params">> := Params}}}}],
+        Events
+    ).
 
 grab_completed_events(Filename) ->
     {ok, LogfileContents} = file:read_file(Filename),
