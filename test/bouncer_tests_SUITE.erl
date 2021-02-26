@@ -20,6 +20,7 @@
 -export([junk_content_invalid_context/1]).
 -export([conflicting_context_invalid/1]).
 -export([distinct_sets_context_valid/1]).
+-export([json_context_valid/1]).
 
 -export([restricted_search_invoices_shop_manager/1]).
 -export([forbidden_w_empty_context/1]).
