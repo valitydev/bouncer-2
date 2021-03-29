@@ -12,7 +12,8 @@
 
 -type opts() :: #{
     pool_opts := gunner:pool_opts(),
-    endpoint := endpoint()
+    endpoint := endpoint(),
+    request_timeout => timeout()
 }.
 
 -opaque client() :: #{
@@ -55,7 +56,7 @@ init(OpaClientOpts) ->
     },
     Client = genlib_map:compact(#{
         endpoint => maps:get(endpoint, OpaClientOpts),
-        request_timeout => get_request_timeout(PoolOpts),
+        request_timeout => get_request_timeout(OpaClientOpts),
         connect_timeout => get_connect_timeout(PoolOpts)
     }),
     {Client, ChildSpec}.
@@ -135,10 +136,9 @@ make_gunner_opts(RequestTimeout, #{connect_timeout := ConnectTimeout}) ->
 make_gunner_opts(RequestTimeout, _Client) ->
     #{request_timeout => RequestTimeout}.
 
--spec get_request_timeout(gunner:pool_opts()) -> timeout().
-get_request_timeout(PoolOpts) ->
-    ClientOpts = maps:get(connection_opts, PoolOpts, #{}),
-    maps:get(request_timeout, ClientOpts, ?DEFAULT_REQUEST_TIMEOUT).
+-spec get_request_timeout(opts()) -> timeout().
+get_request_timeout(Opts) ->
+    maps:get(request_timeout, Opts, ?DEFAULT_REQUEST_TIMEOUT).
 
 -spec get_connect_timeout(gunner:pool_opts()) -> timeout() | undefined.
 get_connect_timeout(PoolOpts) ->

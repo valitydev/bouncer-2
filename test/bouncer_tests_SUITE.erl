@@ -124,6 +124,7 @@ start_bouncer(Env, C) ->
             }},
             {opa, #{
                 endpoint => ?OPA_ENDPOINT_RESOLVE,
+                request_timeout => 1000,
                 pool_opts => #{
                     connection_opts => #{
                         transport => tcp
