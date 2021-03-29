@@ -273,7 +273,11 @@ start_bouncer(Env, C) ->
             }},
             {opa, #{
                 endpoint => ?OPA_ENDPOINT,
-                transport => tcp
+                pool_opts => #{
+                    connection_opts => #{
+                        transport => tcp
+                    }
+                }
             }}
         ] ++ Env
     ),

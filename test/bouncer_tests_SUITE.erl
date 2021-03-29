@@ -45,6 +45,7 @@
 %%
 
 -define(OPA_HOST, "opa").
+-define(OPA_ENDPOINT_RESOLVE, {{resolve, dns, ?OPA_HOST, #{pick => random}}, 8181}).
 -define(OPA_ENDPOINT, {?OPA_HOST, 8181}).
 -define(API_RULESET_ID, "service/authz/api").
 
@@ -122,8 +123,12 @@ start_bouncer(Env, C) ->
                 num_acceptors => 4
             }},
             {opa, #{
-                endpoint => ?OPA_ENDPOINT,
-                transport => tcp
+                endpoint => ?OPA_ENDPOINT_RESOLVE,
+                pool_opts => #{
+                    connection_opts => #{
+                        transport => tcp
+                    }
+                }
             }}
         ] ++ Env
     ),
@@ -508,8 +513,12 @@ connect_failed_means_unavailable(C) ->
         [
             {opa, #{
                 endpoint => {?OPA_HOST, 65535},
-                transport => tcp,
-                event_handler => {ct_gun_event_h, []}
+                pool_opts => #{
+                    connection_opts => #{
+                        transport => tcp,
+                        event_handler => {ct_gun_event_h, []}
+                    }
+                }
             }}
         ],
         C
@@ -523,7 +532,7 @@ connect_failed_means_unavailable(C) ->
         ?assertMatch(
             [
                 {judgement, started},
-                {judgement, {failed, {unavailable, {down, {shutdown, econnrefused}}}}}
+                {judgement, {failed, {unavailable, {connection_failed, {shutdown, econnrefused}}}}}
             ],
             flush_beats(Client, C1)
         )
@@ -581,8 +590,12 @@ start_proxy_bouncer(Proxy, C) ->
         [
             {opa, #{
                 endpoint => ct_proxy:endpoint(Proxy),
-                transport => tcp,
-                event_handler => {ct_gun_event_h, []}
+                pool_opts => #{
+                    connection_opts => #{
+                        transport => tcp,
+                        event_handler => {ct_gun_event_h, []}
+                    }
+                }
             }}
         ],
         C

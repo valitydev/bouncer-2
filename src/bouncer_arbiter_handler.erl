@@ -11,12 +11,14 @@
 %%
 
 -type opts() :: #{
-    pulse => bouncer_arbiter_pulse:handlers()
+    pulse => bouncer_arbiter_pulse:handlers(),
+    opa_client := bouncer_opa_client:client()
 }.
 
 -record(st, {
     pulse :: bouncer_arbiter_pulse:handlers(),
-    pulse_metadata :: bouncer_arbiter_pulse:metadata()
+    pulse_metadata :: bouncer_arbiter_pulse:metadata(),
+    opa_client :: bouncer_opa_client:client()
 }).
 
 -type st() :: #st{}.
@@ -29,7 +31,8 @@ handle_function(Fn, Args, WoodyCtx, Opts) ->
 do_handle_function('Judge', {RulesetID, ContextIn}, WoodyCtx, Opts) ->
     St = #st{
         pulse = maps:get(pulse, Opts, []),
-        pulse_metadata = #{woody_ctx => WoodyCtx}
+        pulse_metadata = #{woody_ctx => WoodyCtx},
+        opa_client = maps:get(opa_client, Opts)
     },
     try
         handle_judge(RulesetID, ContextIn, St)
@@ -47,7 +50,7 @@ handle_judge(RulesetID, ContextIn, St0) ->
     St1 = append_pulse_metadata(#{ruleset => RulesetID}, St0),
     ok = handle_judgement_beat(started, St1),
     {Context, St2} = decode_context(ContextIn, St1),
-    case bouncer_arbiter:judge(RulesetID, Context) of
+    case bouncer_arbiter:judge(RulesetID, Context, St2#st.opa_client) of
         {ok, Judgement} ->
             ok = handle_judgement_beat({completed, Judgement}, St2),
             {ok, encode_judgement(Judgement)};

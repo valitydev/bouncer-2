@@ -31,6 +31,7 @@ init([]) ->
     ServiceOpts = genlib_app:env(?MODULE, services, #{}),
     EventHandlers = genlib_app:env(?MODULE, woody_event_handlers, [woody_event_handler_default]),
     Healthcheck = enable_health_logging(genlib_app:env(?MODULE, health_check, #{})),
+    {OpaClient, OpaClientSpec} = bouncer_opa_client:init(get_opa_opts()),
     WoodySpec = woody_server:child_spec(
         ?MODULE,
         #{
@@ -41,13 +42,14 @@ init([]) ->
             shutdown_timeout => get_shutdown_timeout(),
             event_handler => EventHandlers,
             handlers =>
-                get_handler_specs(ServiceOpts, AuditPulse) ++ get_stub_handler_specs(ServiceOpts),
+                get_handler_specs(ServiceOpts, AuditPulse, OpaClient) ++
+                get_stub_handler_specs(ServiceOpts),
             additional_routes => [erl_health_handle:get_route(Healthcheck)]
         }
     ),
     {ok, {
         #{strategy => one_for_one, intensity => 10, period => 10},
-        AuditSpecs ++ [WoodySpec]
+        AuditSpecs ++ [OpaClientSpec, WoodySpec]
     }}.
 
 -spec get_audit_specs() -> {[supervisor:child_spec()], bouncer_arbiter_pulse:handlers()}.
@@ -82,12 +84,15 @@ get_transport_opts() ->
 get_shutdown_timeout() ->
     genlib_app:env(?MODULE, shutdown_timeout, 0).
 
--spec get_handler_specs(map(), bouncer_arbiter_pulse:handlers()) ->
+-spec get_handler_specs(map(), bouncer_arbiter_pulse:handlers(), bouncer_opa_client:client()) ->
     [woody:http_handler(woody:th_handler())].
-get_handler_specs(ServiceOpts, AuditPulse) ->
+get_handler_specs(ServiceOpts, AuditPulse, OpaClient) ->
     ArbiterService = maps:get(arbiter, ServiceOpts, #{}),
     ArbiterPulse = maps:get(pulse, ArbiterService, []),
-    ArbiterOpts = #{pulse => AuditPulse ++ ArbiterPulse},
+    ArbiterOpts = #{
+        pulse => AuditPulse ++ ArbiterPulse,
+        opa_client => OpaClient
+    },
     [
         {
             maps:get(path, ArbiterService, <<"/v1/arbiter">>),
@@ -105,6 +110,10 @@ get_stub_handler_specs(ServiceOpts) ->
                 bouncer_org_management_stub}
         }
     ].
+
+-spec get_opa_opts() -> bouncer_opa_client:opts().
+get_opa_opts() ->
+    genlib_app:env(?MODULE, opa, #{}).
 
 %%
 

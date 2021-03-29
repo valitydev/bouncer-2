@@ -74,6 +74,14 @@ start_bouncer(Env, C) ->
                 org_management => #{
                     path => OrgmgmtPath
                 }
+            }},
+            {opa, #{
+                endpoint => ?OPA_ENDPOINT,
+                pool_opts => #{
+                    connection_opts => #{
+                        transport => tcp
+                    }
+                }
             }}
         ] ++ Env
     ),
