@@ -1,6 +1,5 @@
 -module(bouncer_tests_SUITE).
 
--include_lib("common_test/include/ct.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 -export([all/0]).
@@ -365,7 +364,7 @@ restricted_search_invoices_shop_manager(C) ->
     Fragment = lists:foldl(fun maps:merge/2, #{}, [
         mk_auth_session_token(),
         mk_env(),
-        mk_op_search_invoices(mk_ordset([#{id => <<"SHOP">>}]), <<"PARTY">>),
+        mk_op_search_invoices(<<"SHOP">>, <<"PARTY">>),
         mk_user(
             <<"USER">>,
             mk_ordset([
@@ -477,12 +476,12 @@ mk_auth_session_token(ExpiresAt) ->
         }
     }.
 
-mk_op_search_invoices(Shops, PartyID) ->
+mk_op_search_invoices(ShopID, PartyID) ->
     #{
         anapi => #{
             op => #{
                 id => <<"SearchInvoices">>,
-                shops => Shops,
+                shop => #{id => ShopID},
                 party => #{id => PartyID}
             }
         }
