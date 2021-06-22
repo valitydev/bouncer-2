@@ -30,9 +30,26 @@ handle_event(Event, State) ->
 %%
 %% Metrics
 %%
+-define(METRIC_KEY(Tag, Content), [gunner, Tag, Content]).
+-define(METRIC_KEY(Tag, Content, GroupID), [gunner, Tag, Content, group, encode_group(GroupID)]).
 
--define(INC, 1).
--define(DEC, -1).
+-define(METRIC_DURATION(Key), ?METRIC_KEY(duration, Key)).
+-define(METRIC_ACQUIRE(Evt, GroupID), ?METRIC_KEY(acquire, Evt, GroupID)).
+-define(METRIC_FREE(Evt, GroupID), ?METRIC_KEY(free, Evt, GroupID)).
+-define(METRIC_CONNECTION_COUNT(Category), ?METRIC_KEY(connections, Category)).
+-define(METRIC_CONNECTION_COUNT(Category, GroupID), ?METRIC_KEY(connections, Category, GroupID)).
+-define(METRIC_CONNECTION(Evt, GroupID), ?METRIC_KEY(connection, Evt, GroupID)).
+
+-define(TIMER_KEY(Tag, Content), {Tag, Content}).
+-define(TIMER_ACQUIRE(GroupID, ClientID),
+    ?TIMER_KEY(acquire, {GroupID, ClientID})
+).
+-define(TIMER_FREE(ConnectionID, GroupID, ClientID),
+    ?TIMER_KEY(free, {ConnectionID, GroupID, ClientID})
+).
+-define(TIMER_CONNECTION_INIT(ConnectionID, GroupID),
+    ?TIMER_KEY(connection_init, {ConnectionID, GroupID})
+).
 
 create_metric(#gunner_pool_init_event{}, _State) ->
     [];
@@ -47,10 +64,10 @@ create_metric(
     },
     State
 ) ->
-    {ok, State1} = start_timer([acquire, encode_group(GroupID), encode_client(ClientID)], State),
+    {ok, State1} = start_timer(?TIMER_ACQUIRE(GroupID, ClientID), State),
     {
         [
-            create_counter([gunner, acquire, started, group, encode_group(GroupID)], ?INC)
+            inc_counter(?METRIC_ACQUIRE(started, GroupID))
         ],
         State1
     };
@@ -63,14 +80,11 @@ create_metric(
     },
     State
 ) ->
-    {ok, Elapsed, State1} = stop_timer(
-        [acquire, encode_group(GroupID), encode_client(ClientID)],
-        State
-    ),
+    {ok, Elapsed, State1} = stop_timer(?TIMER_ACQUIRE(GroupID, ClientID), State),
     {
         [
-            create_counter([gunner, acquire, finished, encode_result(Result), group, encode_group(GroupID)], ?INC),
-            create_duration([gunner, duration, acquire], Elapsed)
+            inc_counter(?METRIC_ACQUIRE([finished, encode_result(Result)], GroupID)),
+            create_duration(?METRIC_DURATION(acquire), Elapsed)
         ],
         State1
     };
@@ -78,14 +92,14 @@ create_metric(
 create_metric(#gunner_connection_locked_event{group_id = GroupID}, State) ->
     {
         [
-            create_counter([gunner, connections, locked, group, encode_group(GroupID)], ?INC)
+            inc_counter(?METRIC_CONNECTION_COUNT(locked, GroupID))
         ],
         State
     };
 create_metric(#gunner_connection_unlocked_event{group_id = GroupID}, State) ->
     {
         [
-            create_counter([gunner, connections, locked, group, encode_group(GroupID)], ?DEC)
+            dec_counter(?METRIC_CONNECTION_COUNT(locked, GroupID))
         ],
         State
     };
@@ -98,13 +112,10 @@ create_metric(
     },
     State
 ) ->
-    {ok, State1} = start_timer(
-        [free, encode_connection(ConnectionID), encode_group(GroupID), encode_client(ClientID)],
-        State
-    ),
+    {ok, State1} = start_timer(?TIMER_FREE(ConnectionID, GroupID, ClientID), State),
     {
         [
-            create_counter([gunner, free, started, group, encode_group(GroupID)], ?INC)
+            inc_counter(?METRIC_FREE(started, GroupID))
         ],
         State1
     };
@@ -116,34 +127,31 @@ create_metric(
     },
     State
 ) ->
-    {ok, Elapsed, State1} = stop_timer(
-        [free, encode_connection(ConnectionID), encode_group(GroupID), encode_client(ClientID)],
-        State
-    ),
+    {ok, Elapsed, State1} = stop_timer(?TIMER_FREE(ConnectionID, GroupID, ClientID), State),
     {
         [
-            create_counter([gunner, free, finished, group, encode_group(GroupID)], ?INC),
-            create_duration([gunner, duration, free], Elapsed)
+            inc_counter(?METRIC_FREE(finished, GroupID)),
+            create_duration(?METRIC_DURATION(free), Elapsed)
         ],
         State1
     };
 create_metric(#gunner_free_error_event{}, State) ->
     {
         [
-            create_counter([gunner, free, error], ?INC),
+            inc_counter([gunner, free, error])
         ],
         State
     };
 %%
 create_metric(#gunner_cleanup_started_event{active_connections = Active}, State) ->
     {ok, State1} = start_timer([cleanup], State),
-    {[create_gauge([gunner, connections, active], Active)], State1};
+    {[create_gauge(?METRIC_CONNECTION_COUNT(active), Active)], State1};
 create_metric(#gunner_cleanup_finished_event{active_connections = Active}, State) ->
     {ok, Elapsed, State1} = stop_timer([cleanup], State),
     {
         [
-            create_gauge([gunner, connections, active], Active),
-            create_duration([gunner, duration, cleanup], Elapsed)
+            create_gauge(?METRIC_CONNECTION_COUNT(active), Active),
+            create_duration(?METRIC_DURATION(cleanup), Elapsed)
         ],
         State1
     };
@@ -151,7 +159,7 @@ create_metric(#gunner_cleanup_finished_event{active_connections = Active}, State
 create_metric(#gunner_client_down_event{}, State) ->
     {
         [
-            create_counter([gunner, client, down], ?INC),
+            inc_counter([gunner, client, down])
         ],
         State
     };
@@ -160,13 +168,10 @@ create_metric(
     #gunner_connection_init_started_event{connection = ConnectionID, group_id = GroupID},
     State
 ) ->
-    {ok, State1} = start_timer(
-        [connection_init, encode_connection(ConnectionID), encode_group(GroupID)],
-        State
-    ),
+    {ok, State1} = start_timer(?TIMER_CONNECTION_INIT(ConnectionID, GroupID), State),
     {
         [
-            create_counter([gunner, connection, init, started, group, encode_group(GroupID)], ?INC)
+            inc_counter(?METRIC_CONNECTION([init, started], GroupID))
         ],
         State1
     };
@@ -174,46 +179,31 @@ create_metric(
     #gunner_connection_init_finished_event{
         connection = ConnectionID,
         group_id = GroupID,
-        result = ok
+        result = Result
     },
     State
 ) ->
-    {ok, Elapsed, State1} = stop_timer(
-        [connection_init, encode_connection(ConnectionID), encode_group(GroupID)],
-        State
-    ),
+    {ok, Elapsed, State1} = stop_timer(?TIMER_CONNECTION_INIT(ConnectionID, GroupID), State),
+    Metrics =
+        case Result of
+            ok ->
+                [
+                    inc_counter(?METRIC_CONNECTION([init, finished, ok], GroupID)),
+                    inc_counter(?METRIC_CONNECTION_COUNT(total, GroupID))
+                ];
+            _ ->
+                [inc_counter(?METRIC_CONNECTION([init, finished, error], GroupID))]
+        end,
     {
-        [
-            create_counter([gunner, connection, init, finished, ok, group, encode_group(GroupID)], ?INC)
-            create_counter([gunner, connections, total, group, encode_group(GroupID)], ?INC),
-            create_duration([gunner, duration, connection, init], Elapsed)
-        ],
-        State1
-    };
-create_metric(
-    #gunner_connection_init_finished_event{
-        connection = ConnectionID,
-        group_id = GroupID
-    },
-    State
-) ->
-    {ok, Elapsed, State1} = stop_timer(
-        [connection_init, encode_connection(ConnectionID), encode_group(GroupID)],
-        State
-    ),
-    {
-        [
-            create_counter([gunner, connection, init, finished, error, group, encode_group(GroupID)], ?INC),
-            create_duration([gunner, duration, connection, init], Elapsed)
-        ],
+        Metrics ++ [create_duration(?METRIC_DURATION([connection, init]), Elapsed)],
         State1
     };
 %%
 create_metric(#gunner_connection_down_event{group_id = GroupID}, State) ->
     {
         [
-            create_counter([gunner, connection, down, group, encode_group(GroupID)], ?INC),
-            create_counter([gunner, connections, total, group, encode_group(GroupID)], ?DEC)
+            inc_counter(?METRIC_CONNECTION(down, GroupID)),
+            dec_counter(?METRIC_CONNECTION_COUNT(total, GroupID))
         ],
         State
     }.
@@ -222,14 +212,8 @@ create_metric(#gunner_connection_down_event{group_id = GroupID}, State) ->
 %% Internal
 %%
 
-encode_connection(ConnectionID) ->
-    ConnectionID.
-
 encode_group({Host, Port}) ->
     [Host, Port].
-
-encode_client(ClientID) ->
-    ClientID.
 
 encode_result(ok) ->
     ok;
@@ -268,6 +252,14 @@ push_metric([]) ->
 push_metric([M | Metrics]) ->
     ok = how_are_you:metric_push(M),
     push_metric(Metrics).
+
+-spec inc_counter(metric_key()) -> metric().
+inc_counter(Key) ->
+    create_counter(Key, 1).
+
+-spec dec_counter(metric_key()) -> metric().
+dec_counter(Key) ->
+    create_counter(Key, -1).
 
 -spec create_counter(metric_key(), non_neg_integer()) -> metric().
 create_counter(Key, Number) ->
