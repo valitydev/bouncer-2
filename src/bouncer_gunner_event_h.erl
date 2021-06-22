@@ -144,10 +144,10 @@ create_metric(#gunner_free_error_event{}, State) ->
     };
 %%
 create_metric(#gunner_cleanup_started_event{active_connections = Active}, State) ->
-    {ok, State1} = start_timer([cleanup], State),
+    {ok, State1} = start_timer(cleanup, State),
     {[create_gauge(?METRIC_CONNECTION_COUNT(active), Active)], State1};
 create_metric(#gunner_cleanup_finished_event{active_connections = Active}, State) ->
-    {ok, Elapsed, State1} = stop_timer([cleanup], State),
+    {ok, Elapsed, State1} = stop_timer(cleanup, State),
     {
         [
             create_gauge(?METRIC_CONNECTION_COUNT(active), Active),
@@ -225,21 +225,17 @@ encode_result({error, {connection_failed, _Reason}}) ->
 start_timer(TimerKey, State) ->
     Time = erlang:monotonic_time(millisecond),
     Timers = maps:get(timers, State, #{}),
-    {ok, State#{timers => Timers#{make_timer_key(TimerKey) => Time}}}.
+    {ok, State#{timers => Timers#{TimerKey => Time}}}.
 
-stop_timer(TimerKey0, State) ->
+stop_timer(TimerKey, State) ->
     Time = erlang:monotonic_time(millisecond),
     Timers = maps:get(timers, State, #{}),
-    TimerKey = make_timer_key(TimerKey0),
     case maps:get(TimerKey, Timers, undefined) of
         TimeStarted when TimeStarted =/= undefined ->
             {ok, Time - TimeStarted, State#{timers => maps:remove(TimerKey, Timers)}};
         undefined ->
             {error, no_timer}
     end.
-
-make_timer_key(Key) when is_list(Key) ->
-    lists:flatten(Key).
 
 %%
 %% Hay utils
@@ -261,7 +257,7 @@ inc_counter(Key) ->
 dec_counter(Key) ->
     create_counter(Key, -1).
 
--spec create_counter(metric_key(), non_neg_integer()) -> metric().
+-spec create_counter(metric_key(), integer()) -> metric().
 create_counter(Key, Number) ->
     how_are_you:metric_construct(counter, Key, Number).
 

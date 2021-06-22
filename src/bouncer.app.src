@@ -15,7 +15,8 @@
         bouncer_proto,
         org_management_proto,
         erl_health,
-        gunner
+        gunner,
+        how_are_you
     ]},
     {env, []},
     {licenses, ["Apache 2.0"]}
