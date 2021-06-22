@@ -67,7 +67,7 @@ create_metric(
     {ok, State1} = start_timer(?TIMER_ACQUIRE(GroupID, ClientID), State),
     {
         [
-            inc_counter(?METRIC_ACQUIRE(started, GroupID))
+            counter_inc(?METRIC_ACQUIRE(started, GroupID))
         ],
         State1
     };
@@ -83,7 +83,7 @@ create_metric(
     {ok, Elapsed, State1} = stop_timer(?TIMER_ACQUIRE(GroupID, ClientID), State),
     {
         [
-            inc_counter(?METRIC_ACQUIRE([finished, encode_result(Result)], GroupID)),
+            counter_inc(?METRIC_ACQUIRE([finished, encode_result(Result)], GroupID)),
             create_duration(?METRIC_DURATION(acquire), Elapsed)
         ],
         State1
@@ -92,14 +92,14 @@ create_metric(
 create_metric(#gunner_connection_locked_event{group_id = GroupID}, State) ->
     {
         [
-            inc_counter(?METRIC_CONNECTION_COUNT(locked, GroupID))
+            counter_inc(?METRIC_CONNECTION_COUNT(locked, GroupID))
         ],
         State
     };
 create_metric(#gunner_connection_unlocked_event{group_id = GroupID}, State) ->
     {
         [
-            dec_counter(?METRIC_CONNECTION_COUNT(locked, GroupID))
+            counter_dec(?METRIC_CONNECTION_COUNT(locked, GroupID))
         ],
         State
     };
@@ -115,7 +115,7 @@ create_metric(
     {ok, State1} = start_timer(?TIMER_FREE(ConnectionID, GroupID, ClientID), State),
     {
         [
-            inc_counter(?METRIC_FREE(started, GroupID))
+            counter_inc(?METRIC_FREE(started, GroupID))
         ],
         State1
     };
@@ -130,7 +130,7 @@ create_metric(
     {ok, Elapsed, State1} = stop_timer(?TIMER_FREE(ConnectionID, GroupID, ClientID), State),
     {
         [
-            inc_counter(?METRIC_FREE(finished, GroupID)),
+            counter_inc(?METRIC_FREE(finished, GroupID)),
             create_duration(?METRIC_DURATION(free), Elapsed)
         ],
         State1
@@ -138,7 +138,7 @@ create_metric(
 create_metric(#gunner_free_error_event{}, State) ->
     {
         [
-            inc_counter([gunner, free, error])
+            counter_inc([gunner, free, error])
         ],
         State
     };
@@ -159,19 +159,22 @@ create_metric(#gunner_cleanup_finished_event{active_connections = Active}, State
 create_metric(#gunner_client_down_event{}, State) ->
     {
         [
-            inc_counter([gunner, client, down])
+            counter_inc([gunner, client, down])
         ],
         State
     };
 %%
 create_metric(
-    #gunner_connection_init_started_event{connection = ConnectionID, group_id = GroupID},
+    #gunner_connection_init_started_event{
+        connection = ConnectionID,
+        group_id = GroupID
+    },
     State
 ) ->
     {ok, State1} = start_timer(?TIMER_CONNECTION_INIT(ConnectionID, GroupID), State),
     {
         [
-            inc_counter(?METRIC_CONNECTION([init, started], GroupID))
+            counter_inc(?METRIC_CONNECTION([init, started], GroupID))
         ],
         State1
     };
@@ -188,11 +191,11 @@ create_metric(
         case Result of
             ok ->
                 [
-                    inc_counter(?METRIC_CONNECTION([init, finished, ok], GroupID)),
-                    inc_counter(?METRIC_CONNECTION_COUNT(total, GroupID))
+                    counter_inc(?METRIC_CONNECTION([init, finished, ok], GroupID)),
+                    counter_inc(?METRIC_CONNECTION_COUNT(total, GroupID))
                 ];
             _ ->
-                [inc_counter(?METRIC_CONNECTION([init, finished, error], GroupID))]
+                [counter_inc(?METRIC_CONNECTION([init, finished, error], GroupID))]
         end,
     {
         Metrics ++ [create_duration(?METRIC_DURATION([connection, init]), Elapsed)],
@@ -202,8 +205,8 @@ create_metric(
 create_metric(#gunner_connection_down_event{group_id = GroupID}, State) ->
     {
         [
-            inc_counter(?METRIC_CONNECTION(down, GroupID)),
-            dec_counter(?METRIC_CONNECTION_COUNT(total, GroupID))
+            counter_inc(?METRIC_CONNECTION(down, GroupID)),
+            counter_dec(?METRIC_CONNECTION_COUNT(total, GroupID))
         ],
         State
     }.
@@ -249,12 +252,12 @@ push_metric([M | Metrics]) ->
     ok = how_are_you:metric_push(M),
     push_metric(Metrics).
 
--spec inc_counter(metric_key()) -> metric().
-inc_counter(Key) ->
+-spec counter_inc(metric_key()) -> metric().
+counter_inc(Key) ->
     create_counter(Key, 1).
 
--spec dec_counter(metric_key()) -> metric().
-dec_counter(Key) ->
+-spec counter_dec(metric_key()) -> metric().
+counter_dec(Key) ->
     create_counter(Key, -1).
 
 -spec create_counter(metric_key(), integer()) -> metric().
