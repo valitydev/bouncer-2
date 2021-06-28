@@ -41,6 +41,7 @@ handle_event(Event, State) ->
 -define(METRIC_CONNECTION(Evt, GroupID), ?METRIC_KEY(connection, Evt, GroupID)).
 
 -define(TIMER_KEY(Tag, Content), {Tag, Content}).
+-define(TIMER_CLEANUP, cleanup).
 -define(TIMER_ACQUIRE(GroupID, ClientID),
     ?TIMER_KEY(acquire, {GroupID, ClientID})
 ).
@@ -88,9 +89,9 @@ is_timed_event(#gunner_free_finished_event{
 }) ->
     {true, {finish, ?TIMER_FREE(ConnectionID, GroupID, ClientID)}};
 is_timed_event(#gunner_cleanup_started_event{}) ->
-    {true, start};
+    {true, {start, ?TIMER_CLEANUP}};
 is_timed_event(#gunner_cleanup_finished_event{}) ->
-    {true, finish};
+    {true, {finish, ?TIMER_CLEANUP}};
 is_timed_event(
     #gunner_connection_init_started_event{
         group_id = GroupID,
