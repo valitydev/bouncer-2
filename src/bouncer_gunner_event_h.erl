@@ -23,8 +23,8 @@
 
 -spec handle_event(gunner_event_h:event(), state()) -> state().
 handle_event(Event, State) ->
-    {Metric, State1} = create_metric(Event, State),
-    ok = push_metric(Metric),
+    {Metrics, State1} = event_to_metrics(Event, State),
+    ok = push_metric(Metrics),
     State1.
 
 %%
@@ -51,170 +51,118 @@ handle_event(Event, State) ->
     ?TIMER_KEY(connection_init, {ConnectionID, GroupID})
 ).
 
-create_metric(#gunner_pool_init_event{}, _State) ->
-    [];
-create_metric(#gunner_pool_terminate_event{}, _State) ->
-    [];
-%%
-create_metric(
-    #gunner_acquire_started_event{
-        group_id = GroupID,
-        client = ClientID,
-        is_locking = _IsLocking
-    },
-    State
-) ->
-    {ok, State1} = start_timer(?TIMER_ACQUIRE(GroupID, ClientID), State),
-    {
-        [
-            counter_inc(?METRIC_ACQUIRE(started, GroupID))
-        ],
-        State1
-    };
-create_metric(
-    #gunner_acquire_finished_event{
-        group_id = GroupID,
-        client = ClientID,
-        result = Result,
-        connection = _ConnectionPid
-    },
-    State
-) ->
-    {ok, Elapsed, State1} = stop_timer(?TIMER_ACQUIRE(GroupID, ClientID), State),
-    {
-        [
-            counter_inc(?METRIC_ACQUIRE([finished, encode_result(Result)], GroupID)),
-            create_duration(?METRIC_DURATION(acquire), Elapsed)
-        ],
-        State1
-    };
-%%
-create_metric(#gunner_connection_locked_event{group_id = GroupID}, State) ->
-    {
-        [
-            counter_inc(?METRIC_CONNECTION_COUNT(locked, GroupID))
-        ],
-        State
-    };
-create_metric(#gunner_connection_unlocked_event{group_id = GroupID}, State) ->
-    {
-        [
-            counter_dec(?METRIC_CONNECTION_COUNT(locked, GroupID))
-        ],
-        State
-    };
-%%
-create_metric(
-    #gunner_free_started_event{
-        connection = ConnectionID,
-        group_id = GroupID,
-        client = ClientID
-    },
-    State
-) ->
-    {ok, State1} = start_timer(?TIMER_FREE(ConnectionID, GroupID, ClientID), State),
-    {
-        [
-            counter_inc(?METRIC_FREE(started, GroupID))
-        ],
-        State1
-    };
-create_metric(
-    #gunner_free_finished_event{
-        connection = ConnectionID,
-        group_id = GroupID,
-        client = ClientID
-    },
-    State
-) ->
-    {ok, Elapsed, State1} = stop_timer(?TIMER_FREE(ConnectionID, GroupID, ClientID), State),
-    {
-        [
-            counter_inc(?METRIC_FREE(finished, GroupID)),
-            create_duration(?METRIC_DURATION(free), Elapsed)
-        ],
-        State1
-    };
-create_metric(#gunner_free_error_event{}, State) ->
-    {
-        [
-            counter_inc([gunner, free, error])
-        ],
-        State
-    };
-%%
-create_metric(#gunner_cleanup_started_event{active_connections = Active}, State) ->
-    {ok, State1} = start_timer(cleanup, State),
-    {[create_gauge(?METRIC_CONNECTION_COUNT(active), Active)], State1};
-create_metric(#gunner_cleanup_finished_event{active_connections = Active}, State) ->
-    {ok, Elapsed, State1} = stop_timer(cleanup, State),
-    {
-        [
-            create_gauge(?METRIC_CONNECTION_COUNT(active), Active),
-            create_duration(?METRIC_DURATION(cleanup), Elapsed)
-        ],
-        State1
-    };
-%%
-create_metric(#gunner_client_down_event{}, State) ->
-    {
-        [
-            counter_inc([gunner, client, down])
-        ],
-        State
-    };
-%%
-create_metric(
+-define(RECORD_NAME(Record), element(1, Record)).
+
+event_to_metrics(Event, State) ->
+    {TimerMeric, State1} = process_timers(Event, State),
+    {create_metric(Event) ++ TimerMeric, State1}.
+
+process_timers(Event, State) ->
+    case is_timed_event(Event) of
+        {true, {start, TimerID}} ->
+            {ok, State1} = start_timer(TimerID, State),
+            {[], State1};
+        {true, {finish, TimerID}} ->
+            {ok, Elapsed, State1} = stop_timer(TimerID, State),
+            {[create_duration(event_to_duration_metric(Event), Elapsed)], State1};
+        false ->
+            {[], State}
+    end.
+
+event_to_duration_metric(Event) -> ?METRIC_DURATION(?RECORD_NAME(Event)).
+
+is_timed_event(#gunner_acquire_started_event{group_id = GroupID, client = ClientID}) ->
+    {true, {start, ?TIMER_ACQUIRE(GroupID, ClientID)}};
+is_timed_event(#gunner_acquire_finished_event{group_id = GroupID, client = ClientID}) ->
+    {true, {finish, ?TIMER_ACQUIRE(GroupID, ClientID)}};
+is_timed_event(#gunner_free_started_event{
+    group_id = GroupID,
+    client = ClientID,
+    connection = ConnectionID
+}) ->
+    {true, {start, ?TIMER_FREE(ConnectionID, GroupID, ClientID)}};
+is_timed_event(#gunner_free_finished_event{
+    group_id = GroupID,
+    client = ClientID,
+    connection = ConnectionID
+}) ->
+    {true, {finish, ?TIMER_FREE(ConnectionID, GroupID, ClientID)}};
+is_timed_event(#gunner_cleanup_started_event{}) ->
+    {true, start};
+is_timed_event(#gunner_cleanup_finished_event{}) ->
+    {true, finish};
+is_timed_event(
     #gunner_connection_init_started_event{
-        connection = ConnectionID,
-        group_id = GroupID
-    },
-    State
-) ->
-    {ok, State1} = start_timer(?TIMER_CONNECTION_INIT(ConnectionID, GroupID), State),
-    {
-        [
-            counter_inc(?METRIC_CONNECTION([init, started], GroupID))
-        ],
-        State1
-    };
-create_metric(
-    #gunner_connection_init_finished_event{
-        connection = ConnectionID,
         group_id = GroupID,
-        result = Result
-    },
-    State
+        connection = ConnectionID
+    }
 ) ->
-    {ok, Elapsed, State1} = stop_timer(?TIMER_CONNECTION_INIT(ConnectionID, GroupID), State),
-    Metrics =
-        case Result of
-            ok ->
-                [
-                    counter_inc(?METRIC_CONNECTION([init, finished, ok], GroupID)),
-                    counter_inc(?METRIC_CONNECTION_COUNT(total, GroupID))
-                ];
-            _ ->
-                [counter_inc(?METRIC_CONNECTION([init, finished, error], GroupID))]
-        end,
-    {
-        Metrics ++ [create_duration(?METRIC_DURATION([connection, init]), Elapsed)],
-        State1
-    };
+    {true, {start, ?TIMER_CONNECTION_INIT(GroupID, ConnectionID)}};
+is_timed_event(
+    #gunner_connection_init_finished_event{
+        group_id = GroupID,
+        connection = ConnectionID
+    }
+) ->
+    {true, {finish, ?TIMER_CONNECTION_INIT(GroupID, ConnectionID)}};
+is_timed_event(_) ->
+    false.
+
+create_metric(#gunner_pool_init_event{}) ->
+    [];
+create_metric(#gunner_pool_terminate_event{}) ->
+    [];
 %%
-create_metric(#gunner_connection_down_event{group_id = GroupID}, State) ->
-    {
-        [
-            counter_inc(?METRIC_CONNECTION(down, GroupID)),
-            counter_dec(?METRIC_CONNECTION_COUNT(total, GroupID))
-        ],
-        State
-    }.
+create_metric(#gunner_acquire_started_event{group_id = GroupID}) ->
+    [counter_inc(?METRIC_ACQUIRE(started, GroupID))];
+create_metric(#gunner_acquire_finished_event{group_id = GroupID, result = Result}) ->
+    [counter_inc(?METRIC_ACQUIRE([finished, encode_result(Result)], GroupID))];
+%%
+create_metric(#gunner_connection_locked_event{group_id = GroupID}) ->
+    [counter_inc(?METRIC_CONNECTION_COUNT(locked, GroupID))];
+create_metric(#gunner_connection_unlocked_event{group_id = GroupID}) ->
+    [counter_dec(?METRIC_CONNECTION_COUNT(locked, GroupID))];
+%%
+create_metric(#gunner_free_started_event{group_id = GroupID}) ->
+    [counter_inc(?METRIC_FREE(started, GroupID))];
+create_metric(#gunner_free_finished_event{group_id = GroupID}) ->
+    [counter_inc(?METRIC_FREE(finished, GroupID))];
+create_metric(#gunner_free_error_event{}) ->
+    [counter_inc([gunner, free, error])];
+%%
+create_metric(#gunner_cleanup_started_event{active_connections = Active}) ->
+    [create_gauge(?METRIC_CONNECTION_COUNT(active), Active)];
+create_metric(#gunner_cleanup_finished_event{active_connections = Active}) ->
+    [create_gauge(?METRIC_CONNECTION_COUNT(active), Active)];
+%%
+create_metric(#gunner_client_down_event{}) ->
+    [counter_inc([gunner, client, down])];
+%%
+create_metric(#gunner_connection_init_started_event{group_id = GroupID}) ->
+    [counter_inc(?METRIC_CONNECTION([init, started], GroupID))];
+%%
+create_metric(#gunner_connection_init_finished_event{group_id = GroupID, result = ok}) ->
+    [
+        counter_inc(?METRIC_CONNECTION([init, finished, ok], GroupID)),
+        counter_inc(?METRIC_CONNECTION_COUNT(total, GroupID))
+    ];
+create_metric(#gunner_connection_init_finished_event{group_id = GroupID, result = _}) ->
+    [
+        counter_inc(?METRIC_CONNECTION([init, finished, error], GroupID))
+    ];
+%%
+create_metric(#gunner_connection_down_event{group_id = GroupID}) ->
+    [
+        counter_inc(?METRIC_CONNECTION(down, GroupID)),
+        counter_dec(?METRIC_CONNECTION_COUNT(total, GroupID))
+    ].
 
 %%
 %% Internal
 %%
 
+encode_group({Host, Port}) when is_tuple(Host) ->
+    [tuple_to_list(Host), Port];
 encode_group({Host, Port}) ->
     [Host, Port].
 
