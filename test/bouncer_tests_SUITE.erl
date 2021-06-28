@@ -125,7 +125,7 @@ start_bouncer(Env, C) ->
                 endpoint => ?OPA_ENDPOINT_RESOLVE,
                 request_timeout => 1000,
                 pool_opts => #{
-                    event_handler => {bouncer_gunner_event_h, #{}},
+                    event_handler => {bouncer_gunner_metrics_event_h, #{}},
                     connection_opts => #{
                         transport => tcp
                     }
