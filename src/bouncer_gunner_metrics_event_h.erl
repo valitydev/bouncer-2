@@ -25,9 +25,15 @@
 
 -spec handle_event(gunner_event_h:event(), state()) -> state().
 handle_event(Event, State) ->
-    {TimerMeric, State1} = process_timers(Event, State),
-    ok = push_metrics(create_metric(Event) ++ TimerMeric),
-    State1.
+    try
+        {TimerMeric, State1} = process_timers(Event, State),
+        ok = push_metrics(create_metric(Event) ++ TimerMeric),
+        State1
+    catch
+        throw:{stop_timer_failed, {no_timer, TimerKey}} ->
+            _ = logger:error("Tried to stop a non-existant timer: ~p", [TimerKey]),
+            State
+    end.
 
 %%
 %% Metrics
@@ -58,10 +64,9 @@ handle_event(Event, State) ->
 process_timers(Event, State) ->
     case is_timed_event(Event) of
         {true, {start, TimerID}} ->
-            {ok, State1} = start_timer(TimerID, State),
-            {[], State1};
+            {[], start_timer(TimerID, State)};
         {true, {finish, TimerID, MetricID}} ->
-            {ok, Elapsed, State1} = stop_timer(TimerID, State),
+            {Elapsed, State1} = stop_timer(TimerID, State),
             {[create_duration(MetricID, Elapsed)], State1};
         false ->
             {[], State}
@@ -159,9 +164,12 @@ create_metric(#gunner_connection_down_event{group_id = GroupID}) ->
 %%
 
 encode_group({IP, Port}) when is_tuple(IP) ->
-    [inet:ntoa(IP), Port];
-encode_group({Host, Port}) ->
-    [Host, Port].
+    encode_group({inet:ntoa(IP), Port});
+encode_group({Host, Port}) when is_list(Host) ->
+    encode_group(list_to_binary(Host), integer_to_binary(Port)).
+
+encode_group(Host, Port) ->
+    <<Host/binary, ":", Port/binary>>.
 
 encode_result(ok) ->
     ok;
@@ -172,15 +180,15 @@ encode_result({error, {connection_failed, _Reason}}) ->
 
 start_timer(TimerKey, State) ->
     Time = erlang:monotonic_time(microsecond),
-    {ok, State#{TimerKey => Time}}.
+    State#{TimerKey => Time}.
 
 stop_timer(TimerKey, State) ->
     Time = erlang:monotonic_time(microsecond),
     case maps:get(TimerKey, State, undefined) of
         TimeStarted when TimeStarted =/= undefined ->
-            {ok, Time - TimeStarted, maps:remove(TimerKey, State)};
+            {Time - TimeStarted, maps:remove(TimerKey, State)};
         undefined ->
-            {error, no_timer}
+            throw({stop_timer_failed, {no_timer, TimerKey}})
     end.
 
 %%
