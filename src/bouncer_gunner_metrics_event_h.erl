@@ -110,8 +110,11 @@ is_timed_event(
 is_timed_event(_) ->
     false.
 
-create_metric(#gunner_pool_init_event{}) ->
-    [];
+create_metric(#gunner_pool_init_event{pool_opts = PoolOpts}) ->
+    [
+        create_gauge(?METRIC_CONNECTION_COUNT([config, max]), maps:get(max_size, PoolOpts)),
+        create_gauge(?METRIC_CONNECTION_COUNT([config, min]), maps:get(min_size, PoolOpts))
+    ];
 create_metric(#gunner_pool_terminate_event{}) ->
     [];
 %%

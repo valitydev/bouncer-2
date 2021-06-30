@@ -78,7 +78,6 @@ start_bouncer(Env, C) ->
             {opa, #{
                 endpoint => ?OPA_ENDPOINT,
                 pool_opts => #{
-                    event_handler => {bouncer_gunner_metrics_event_h, #{}},
                     connection_opts => #{
                         transport => tcp
                     }
