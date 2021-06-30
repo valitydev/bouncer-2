@@ -69,11 +69,18 @@ end_per_testcase(_Name, C) ->
 -spec basic_metrics_test(config()) -> _.
 basic_metrics_test(C) ->
     _ = call_judge("service/authz/api", #bdcs_Context{fragments = #{}}, mk_client(C)),
+    _ = timer:sleep(100),
     ?assertEqual(25, ct_hay_publisher:get_metric([gunner, connections, config, max])),
     ?assertEqual(5, ct_hay_publisher:get_metric([gunner, connections, config, min])),
     ?assertEqual(
         1,
-        ct_hay_publisher:get_metric([gunner, acquire, started, group, encode_group(?OPA_ENDPOINT)])
+        ct_hay_publisher:get_metric([
+            gunner,
+            acquire,
+            started,
+            group,
+            encode_group(?OPA_ENDPOINT)
+        ])
     ),
     ?assertEqual(
         1,
@@ -109,7 +116,16 @@ basic_metrics_test(C) ->
             encode_group(?OPA_ENDPOINT)
         ])
     ),
-    ?assertEqual(1, ct_hay_publisher:get_metric([gunner, connections, active])).
+    ?assertEqual(
+        1,
+        ct_hay_publisher:get_metric([
+            gunner,
+            connections,
+            total,
+            group,
+            encode_group(?OPA_ENDPOINT)
+        ])
+    ).
 
 %%
 
