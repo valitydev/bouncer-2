@@ -14,9 +14,6 @@
 
 -type timer_id() :: term().
 -type timer_start_ts() :: non_neg_integer().
-
--type metric() :: how_are_you:metric().
--type metrics() :: [metric()].
 -type metric_key() :: how_are_you:metric_key().
 
 %%
@@ -26,9 +23,8 @@
 -spec handle_event(gunner_event_h:event(), state()) -> state().
 handle_event(Event, State) ->
     try
-        {TimerMeric, State1} = process_timers(Event, State),
-        ok = push_metrics(create_metric(Event) ++ TimerMeric),
-        State1
+        ok = create_metric(Event),
+        process_timers(Event, State)
     catch
         throw:{stop_timer_failed, {no_timer, TimerKey}} ->
             _ = logger:error("Tried to stop a non-existant timer: ~p", [TimerKey]),
@@ -64,12 +60,13 @@ handle_event(Event, State) ->
 process_timers(Event, State) ->
     case is_timed_event(Event) of
         {true, {start, TimerID}} ->
-            {[], start_timer(TimerID, State)};
+            start_timer(TimerID, State);
         {true, {finish, TimerID, MetricID}} ->
             {Elapsed, State1} = stop_timer(TimerID, State),
-            {[create_duration(MetricID, Elapsed)], State1};
+            ok = create_duration(MetricID, Elapsed),
+            State1;
         false ->
-            {[], State}
+            State
     end.
 
 is_timed_event(#gunner_acquire_started_event{group_id = GroupID, client = ClientID}) ->
@@ -111,56 +108,48 @@ is_timed_event(_) ->
     false.
 
 create_metric(#gunner_pool_init_event{pool_opts = PoolOpts}) ->
-    [
-        create_gauge(?METRIC_CONNECTION_COUNT([config, max]), maps:get(max_size, PoolOpts)),
-        create_gauge(?METRIC_CONNECTION_COUNT([config, min]), maps:get(min_size, PoolOpts))
-    ];
+    ok = create_gauge(?METRIC_CONNECTION_COUNT([config, max]), maps:get(max_size, PoolOpts)),
+    create_gauge(?METRIC_CONNECTION_COUNT([config, min]), maps:get(min_size, PoolOpts));
 create_metric(#gunner_pool_terminate_event{}) ->
-    [];
+    ok;
 %%
 create_metric(#gunner_acquire_started_event{group_id = GroupID}) ->
-    [counter_inc(?METRIC_ACQUIRE(started, GroupID))];
+    counter_inc(?METRIC_ACQUIRE(started, GroupID));
 create_metric(#gunner_acquire_finished_event{group_id = GroupID, result = Result}) ->
-    [counter_inc(?METRIC_ACQUIRE([finished, encode_result(Result)], GroupID))];
+    counter_inc(?METRIC_ACQUIRE([finished, encode_result(Result)], GroupID));
 %%
 create_metric(#gunner_connection_locked_event{group_id = GroupID}) ->
-    [counter_inc(?METRIC_CONNECTION_COUNT(locked, GroupID))];
+    counter_inc(?METRIC_CONNECTION_COUNT(locked, GroupID));
 create_metric(#gunner_connection_unlocked_event{group_id = GroupID}) ->
-    [counter_dec(?METRIC_CONNECTION_COUNT(locked, GroupID))];
+    counter_dec(?METRIC_CONNECTION_COUNT(locked, GroupID));
 %%
 create_metric(#gunner_free_started_event{group_id = GroupID}) ->
-    [counter_inc(?METRIC_FREE(started, GroupID))];
+    counter_inc(?METRIC_FREE(started, GroupID));
 create_metric(#gunner_free_finished_event{group_id = GroupID}) ->
-    [counter_inc(?METRIC_FREE(finished, GroupID))];
+    counter_inc(?METRIC_FREE(finished, GroupID));
 create_metric(#gunner_free_error_event{}) ->
-    [counter_inc([gunner, free, error])];
+    counter_inc([gunner, free, error]);
 %%
 create_metric(#gunner_cleanup_started_event{}) ->
-    [];
+    ok;
 create_metric(#gunner_cleanup_finished_event{active_connections = Active}) ->
-    [create_gauge(?METRIC_CONNECTION_COUNT(active), Active)];
+    create_gauge(?METRIC_CONNECTION_COUNT(active), Active);
 %%
 create_metric(#gunner_client_down_event{}) ->
-    [counter_inc([gunner, client, down])];
+    counter_inc([gunner, client, down]);
 %%
 create_metric(#gunner_connection_init_started_event{group_id = GroupID}) ->
-    [counter_inc(?METRIC_CONNECTION([init, started], GroupID))];
+    counter_inc(?METRIC_CONNECTION([init, started], GroupID));
 %%
 create_metric(#gunner_connection_init_finished_event{group_id = GroupID, result = ok}) ->
-    [
-        counter_inc(?METRIC_CONNECTION([init, finished, ok], GroupID)),
-        counter_inc(?METRIC_CONNECTION_COUNT(total, GroupID))
-    ];
+    ok = counter_inc(?METRIC_CONNECTION([init, finished, ok], GroupID)),
+    counter_inc(?METRIC_CONNECTION_COUNT(total, GroupID));
 create_metric(#gunner_connection_init_finished_event{group_id = GroupID, result = _}) ->
-    [
-        counter_inc(?METRIC_CONNECTION([init, finished, error], GroupID))
-    ];
+    counter_inc(?METRIC_CONNECTION([init, finished, error], GroupID));
 %%
 create_metric(#gunner_connection_down_event{group_id = GroupID}) ->
-    [
-        counter_inc(?METRIC_CONNECTION(down, GroupID)),
-        counter_dec(?METRIC_CONNECTION_COUNT(total, GroupID))
-    ].
+    ok = counter_inc(?METRIC_CONNECTION(down, GroupID)),
+    counter_dec(?METRIC_CONNECTION_COUNT(total, GroupID)).
 
 %%
 %% Internal
@@ -198,34 +187,31 @@ stop_timer(TimerKey, State) ->
 %% Hay utils
 %%
 
--spec push_metrics(metrics()) -> ok.
-
-push_metrics([]) ->
-    ok;
-push_metrics([M | Metrics]) ->
-    ok = how_are_you:metric_push(M),
-    push_metrics(Metrics).
-
--spec counter_inc(metric_key()) -> metric().
+-spec counter_inc(metric_key()) -> ok.
 counter_inc(Key) ->
     create_counter(Key, 1).
 
--spec counter_dec(metric_key()) -> metric().
+-spec counter_dec(metric_key()) -> ok.
 counter_dec(Key) ->
     create_counter(Key, -1).
 
--spec create_counter(metric_key(), integer()) -> metric().
+-spec create_counter(metric_key(), integer()) -> ok.
 create_counter(Key, Number) ->
-    how_are_you:metric_construct(counter, Key, Number).
+    create_metric(counter, Key, Number).
 
--spec create_gauge(metric_key(), non_neg_integer()) -> metric().
+-spec create_gauge(metric_key(), non_neg_integer()) -> ok.
 create_gauge(Key, Number) ->
-    how_are_you:metric_construct(gauge, Key, Number).
+    create_metric(gauge, Key, Number).
 
--spec create_duration(metric_key(), non_neg_integer()) -> metric().
+-spec create_duration(metric_key(), non_neg_integer()) -> ok.
 create_duration(KeyPrefix, Duration) ->
     BinKey = build_bin_key(Duration),
-    how_are_you:metric_construct(counter, [KeyPrefix, BinKey], 1).
+    create_metric(counter, [KeyPrefix, BinKey], 1).
+
+-spec create_metric(atom(), metric_key(), integer()) -> ok.
+create_metric(Type, Key, Value) ->
+    Metric = how_are_you:metric_construct(Type, Key, Value),
+    how_are_you:metric_push(Metric).
 
 %%
 
