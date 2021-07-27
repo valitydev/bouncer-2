@@ -36,14 +36,12 @@ handle_event(Event, State) ->
 %%
 
 -define(METRIC_KEY(Tag, Content), [gunner, Tag, Content]).
--define(METRIC_KEY(Tag, Content, GroupID), [gunner, Tag, Content, group, encode_group(GroupID)]).
 
 -define(METRIC_DURATION(Key), ?METRIC_KEY(duration, Key)).
--define(METRIC_ACQUIRE(Evt, GroupID), ?METRIC_KEY(acquire, Evt, GroupID)).
--define(METRIC_FREE(Evt, GroupID), ?METRIC_KEY(free, Evt, GroupID)).
+-define(METRIC_ACQUIRE(Evt), ?METRIC_KEY(acquire, Evt)).
+-define(METRIC_FREE(Evt), ?METRIC_KEY(free, Evt)).
 -define(METRIC_CONNECTION_COUNT(Category), ?METRIC_KEY(connections, Category)).
--define(METRIC_CONNECTION_COUNT(Category, GroupID), ?METRIC_KEY(connections, Category, GroupID)).
--define(METRIC_CONNECTION(Evt, GroupID), ?METRIC_KEY(connection, Evt, GroupID)).
+-define(METRIC_CONNECTION(Evt), ?METRIC_KEY(connection, Evt)).
 
 -define(TIMER_KEY(Tag, Content), {Tag, Content}).
 -define(TIMER_CLEANUP, cleanup).
@@ -113,20 +111,20 @@ create_metric(#gunner_pool_init_event{pool_opts = PoolOpts}) ->
 create_metric(#gunner_pool_terminate_event{}) ->
     ok;
 %%
-create_metric(#gunner_acquire_started_event{group_id = GroupID}) ->
-    counter_inc(?METRIC_ACQUIRE(started, GroupID));
-create_metric(#gunner_acquire_finished_event{group_id = GroupID, result = Result}) ->
-    counter_inc(?METRIC_ACQUIRE([finished, encode_result(Result)], GroupID));
+create_metric(#gunner_acquire_started_event{}) ->
+    counter_inc(?METRIC_ACQUIRE(started));
+create_metric(#gunner_acquire_finished_event{result = Result}) ->
+    counter_inc(?METRIC_ACQUIRE([finished, encode_result(Result)]));
 %%
-create_metric(#gunner_connection_locked_event{group_id = GroupID}) ->
-    counter_inc(?METRIC_CONNECTION_COUNT(locked, GroupID));
-create_metric(#gunner_connection_unlocked_event{group_id = GroupID}) ->
-    counter_dec(?METRIC_CONNECTION_COUNT(locked, GroupID));
+create_metric(#gunner_connection_locked_event{}) ->
+    counter_inc(?METRIC_CONNECTION_COUNT(locked));
+create_metric(#gunner_connection_unlocked_event{}) ->
+    counter_dec(?METRIC_CONNECTION_COUNT(locked));
 %%
-create_metric(#gunner_free_started_event{group_id = GroupID}) ->
-    counter_inc(?METRIC_FREE(started, GroupID));
-create_metric(#gunner_free_finished_event{group_id = GroupID}) ->
-    counter_inc(?METRIC_FREE(finished, GroupID));
+create_metric(#gunner_free_started_event{}) ->
+    counter_inc(?METRIC_FREE(started));
+create_metric(#gunner_free_finished_event{}) ->
+    counter_inc(?METRIC_FREE(finished));
 create_metric(#gunner_free_error_event{}) ->
     counter_inc([gunner, free, error]);
 %%
@@ -138,30 +136,27 @@ create_metric(#gunner_cleanup_finished_event{active_connections = Active}) ->
 create_metric(#gunner_client_down_event{}) ->
     counter_inc([gunner, client, down]);
 %%
-create_metric(#gunner_connection_init_started_event{group_id = GroupID}) ->
-    counter_inc(?METRIC_CONNECTION([init, started], GroupID));
+create_metric(#gunner_connection_init_started_event{}) ->
+    counter_inc(?METRIC_CONNECTION([init, started]));
 %%
-create_metric(#gunner_connection_init_finished_event{group_id = GroupID, result = ok}) ->
-    ok = counter_inc(?METRIC_CONNECTION([init, finished, ok], GroupID)),
-    counter_inc(?METRIC_CONNECTION_COUNT(total, GroupID));
-create_metric(#gunner_connection_init_finished_event{group_id = GroupID, result = _}) ->
-    counter_inc(?METRIC_CONNECTION([init, finished, error], GroupID));
+create_metric(#gunner_connection_init_finished_event{result = ok}) ->
+    ok = counter_inc(?METRIC_CONNECTION([init, finished, ok])),
+    counter_inc(?METRIC_CONNECTION_COUNT(total));
+create_metric(#gunner_connection_init_finished_event{result = _}) ->
+    counter_inc(?METRIC_CONNECTION([init, finished, error]));
 %%
-create_metric(#gunner_connection_down_event{group_id = GroupID}) ->
-    ok = counter_inc(?METRIC_CONNECTION(down, GroupID)),
-    counter_dec(?METRIC_CONNECTION_COUNT(total, GroupID)).
+create_metric(#gunner_connection_down_event{reason = Reason}) ->
+    ok = counter_inc(?METRIC_CONNECTION([down, encode_down_reason(Reason)])),
+    counter_dec(?METRIC_CONNECTION_COUNT(total)).
 
 %%
 %% Internal
 %%
 
-encode_group({IP, Port}) when is_tuple(IP) ->
-    encode_group({inet:ntoa(IP), Port});
-encode_group({Host, Port}) when is_list(Host) ->
-    encode_group(list_to_binary(Host), integer_to_binary(Port)).
-
-encode_group(Host, Port) ->
-    <<Host/binary, ":", Port/binary>>.
+encode_down_reason(normal) ->
+    normal;
+encode_down_reason({abnormal, _}) ->
+    abnormal.
 
 encode_result(ok) ->
     ok;

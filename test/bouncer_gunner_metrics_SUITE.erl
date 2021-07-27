@@ -77,9 +77,7 @@ basic_metrics_test(C) ->
         ct_hay_publisher:get_metric([
             gunner,
             acquire,
-            started,
-            group,
-            encode_group(?OPA_ENDPOINT)
+            started
         ])
     ),
     ?assertEqual(
@@ -88,9 +86,7 @@ basic_metrics_test(C) ->
             gunner,
             connection,
             init,
-            started,
-            group,
-            encode_group(?OPA_ENDPOINT)
+            started
         ])
     ),
     ?assertEqual(
@@ -100,9 +96,7 @@ basic_metrics_test(C) ->
             connection,
             init,
             finished,
-            ok,
-            group,
-            encode_group(?OPA_ENDPOINT)
+            ok
         ])
     ),
     ?assertEqual(
@@ -111,9 +105,7 @@ basic_metrics_test(C) ->
             gunner,
             acquire,
             finished,
-            ok,
-            group,
-            encode_group(?OPA_ENDPOINT)
+            ok
         ])
     ),
     ?assertEqual(
@@ -121,9 +113,7 @@ basic_metrics_test(C) ->
         ct_hay_publisher:get_metric([
             gunner,
             connections,
-            total,
-            group,
-            encode_group(?OPA_ENDPOINT)
+            total
         ])
     ).
 
@@ -203,13 +193,3 @@ stop_bouncer(C) ->
         C,
         fun(Apps) -> genlib_app:stop_unload_applications(Apps) end
     ).
-
-%%
-
-encode_group({IP, Port}) when is_tuple(IP) ->
-    encode_group({inet:ntoa(IP), Port});
-encode_group({Host, Port}) when is_list(Host) ->
-    encode_group(list_to_binary(Host), integer_to_binary(Port)).
-
-encode_group(Host, Port) ->
-    <<Host/binary, ":", Port/binary>>.
