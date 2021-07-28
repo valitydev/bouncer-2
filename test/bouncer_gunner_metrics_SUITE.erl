@@ -70,54 +70,25 @@ end_per_testcase(_Name, C) ->
 basic_metrics_test(C) ->
     _ = call_judge("service/authz/api", #bdcs_Context{fragments = #{}}, mk_client(C)),
     _ = timer:sleep(100),
-    ?assertEqual(25, ct_hay_publisher:get_metric([gunner, connections, config, max])),
-    ?assertEqual(5, ct_hay_publisher:get_metric([gunner, connections, config, min])),
-    ?assertEqual(
-        1,
-        ct_hay_publisher:get_metric([
-            gunner,
-            acquire,
-            started
-        ])
-    ),
-    ?assertEqual(
-        1,
-        ct_hay_publisher:get_metric([
-            gunner,
-            connection,
-            init,
-            started
-        ])
-    ),
-    ?assertEqual(
-        1,
-        ct_hay_publisher:get_metric([
-            gunner,
-            connection,
-            init,
-            finished,
-            ok
-        ])
-    ),
-    ?assertEqual(
-        1,
-        ct_hay_publisher:get_metric([
-            gunner,
-            acquire,
-            finished,
-            ok
-        ])
-    ),
-    ?assertEqual(
-        1,
-        ct_hay_publisher:get_metric([
-            gunner,
-            connections,
-            total
-        ])
-    ).
+    ?assertEqual(25, get_metric([gunner, config, connections, max])),
+    ?assertEqual(5, get_metric([gunner, config, connections, min])),
+    ?assertEqual(1, get_metric([gunner, acquire, started])),
+    ?assertEqual(1, get_metric([gunner, connection, init, started])),
+    ?assertEqual(1, get_metric([gunner, connection, init, finished, ok])),
+    ?assertEqual(1, get_metric([gunner, acquire, finished, ok])),
+    ConnectionInits = get_metric([gunner, connection, init, finished, ok]),
+    ConnectionDowns = get_metric([gunner, connection, down, normal]),
+    ?assertEqual(1, ConnectionInits - ConnectionDowns).
 
 %%
+
+get_metric(Key) ->
+    case ct_hay_publisher:get_metric(Key) of
+        undefined ->
+            0;
+        Metric ->
+            Metric
+    end.
 
 mk_client(C) ->
     WoodyCtx = woody_context:new(genlib:to_binary(?CONFIG(testcase, C))),

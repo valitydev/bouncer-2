@@ -40,7 +40,7 @@ handle_event(Event, State) ->
 -define(METRIC_DURATION(Key), ?METRIC_KEY(duration, Key)).
 -define(METRIC_ACQUIRE(Evt), ?METRIC_KEY(acquire, Evt)).
 -define(METRIC_FREE(Evt), ?METRIC_KEY(free, Evt)).
--define(METRIC_CONNECTION_COUNT(Category), ?METRIC_KEY(connections, Category)).
+-define(METRIC_LOCK(Evt), ?METRIC_KEY(lock, Evt)).
 -define(METRIC_CONNECTION(Evt), ?METRIC_KEY(connection, Evt)).
 
 -define(TIMER_KEY(Tag, Content), {Tag, Content}).
@@ -106,8 +106,8 @@ is_timed_event(_) ->
     false.
 
 create_metric(#gunner_pool_init_event{pool_opts = PoolOpts}) ->
-    ok = create_gauge(?METRIC_CONNECTION_COUNT([config, max]), maps:get(max_size, PoolOpts)),
-    create_gauge(?METRIC_CONNECTION_COUNT([config, min]), maps:get(min_size, PoolOpts));
+    ok = create_gauge(?METRIC_KEY(config, [connections, max]), maps:get(max_size, PoolOpts)),
+    create_gauge(?METRIC_KEY(config, [connections, min]), maps:get(min_size, PoolOpts));
 create_metric(#gunner_pool_terminate_event{}) ->
     ok;
 %%
@@ -117,9 +117,9 @@ create_metric(#gunner_acquire_finished_event{result = Result}) ->
     counter_inc(?METRIC_ACQUIRE([finished, encode_result(Result)]));
 %%
 create_metric(#gunner_connection_locked_event{}) ->
-    counter_inc(?METRIC_CONNECTION_COUNT(locked));
+    counter_inc(?METRIC_LOCK(locked));
 create_metric(#gunner_connection_unlocked_event{}) ->
-    counter_dec(?METRIC_CONNECTION_COUNT(locked));
+    counter_inc(?METRIC_LOCK(unlocked));
 %%
 create_metric(#gunner_free_started_event{}) ->
     counter_inc(?METRIC_FREE(started));
@@ -128,10 +128,10 @@ create_metric(#gunner_free_finished_event{}) ->
 create_metric(#gunner_free_error_event{}) ->
     counter_inc([gunner, free, error]);
 %%
-create_metric(#gunner_cleanup_started_event{}) ->
-    ok;
+create_metric(#gunner_cleanup_started_event{active_connections = Active}) ->
+    create_gauge(?METRIC_KEY(connections, [cleanup, before]), Active);
 create_metric(#gunner_cleanup_finished_event{active_connections = Active}) ->
-    create_gauge(?METRIC_CONNECTION_COUNT(active), Active);
+    create_gauge(?METRIC_KEY(connections, [cleanup, 'after']), Active);
 %%
 create_metric(#gunner_client_down_event{}) ->
     counter_inc([gunner, client, down]);
@@ -140,14 +140,12 @@ create_metric(#gunner_connection_init_started_event{}) ->
     counter_inc(?METRIC_CONNECTION([init, started]));
 %%
 create_metric(#gunner_connection_init_finished_event{result = ok}) ->
-    ok = counter_inc(?METRIC_CONNECTION([init, finished, ok])),
-    counter_inc(?METRIC_CONNECTION_COUNT(total));
+    counter_inc(?METRIC_CONNECTION([init, finished, ok]));
 create_metric(#gunner_connection_init_finished_event{result = _}) ->
     counter_inc(?METRIC_CONNECTION([init, finished, error]));
 %%
 create_metric(#gunner_connection_down_event{reason = Reason}) ->
-    ok = counter_inc(?METRIC_CONNECTION([down, encode_down_reason(Reason)])),
-    counter_dec(?METRIC_CONNECTION_COUNT(total)).
+    counter_inc(?METRIC_CONNECTION([down, encode_down_reason(Reason)])).
 
 %%
 %% Internal
@@ -186,10 +184,6 @@ stop_timer(TimerKey, State) ->
 counter_inc(Key) ->
     create_counter(Key, 1).
 
--spec counter_dec(metric_key()) -> ok.
-counter_dec(Key) ->
-    create_counter(Key, -1).
-
 -spec create_counter(metric_key(), integer()) -> ok.
 create_counter(Key, Number) ->
     create_metric(counter, Key, Number).
@@ -210,10 +204,10 @@ create_metric(Type, Key, Value) ->
 
 %%
 
--define(_10US, "10μs").
--define(_50US, "50μs").
--define(_100US, "100μs").
--define(_500US, "500μs").
+-define(_10US, "10us").
+-define(_50US, "50us").
+-define(_100US, "100us").
+-define(_500US, "500us").
 -define(_1MS, "1ms").
 -define(_5MS, "5ms").
 -define(_10MS, "10ms").
@@ -235,7 +229,7 @@ build_bin_key(Value) ->
         Value < 10 -> ?LT(?_10US);
         Value < 50 -> ?BETWEEN(?_10US, ?_50US);
         Value < 100 -> ?BETWEEN(?_50US, ?_100US);
-        Value < 500 -> ?BETWEEN(?_100US, ?_100US);
+        Value < 500 -> ?BETWEEN(?_100US, ?_500US);
         Value < 1000 -> ?BETWEEN(?_500US, ?_1MS);
         Value < 5 * 1000 -> ?BETWEEN(?_1MS, ?_5MS);
         Value < 10 * 1000 -> ?BETWEEN(?_5MS, ?_10MS);
