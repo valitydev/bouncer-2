@@ -25,6 +25,9 @@
     | {set, field_type()}
     | {map, field_type(), field_type()}.
 
+-type field_raw_value(_Type) :: term().
+-type field_encoded_value(_Type) :: term().
+
 -type struct_field_info() ::
     {field_num(), field_req(), field_type(), field_name(), any()}.
 
@@ -98,6 +101,7 @@ from_thrift_struct([{_, _Req, Type, Name, _Default} | Rest], Struct, Idx, Acc) -
 from_thrift_struct([], _Struct, _, Acc) ->
     Acc.
 
+-spec from_thrift_value(Type :: field_type(), field_raw_value(Type)) -> field_encoded_value(Type).
 from_thrift_value({struct, struct, {Mod, Name}}, V) ->
     {struct, _, StructDef} = Mod:struct_info(Name),
     from_thrift_struct(StructDef, V);
