@@ -68,7 +68,8 @@ to_thrift_struct([], MapLeft, _Idx, Acc, _NameFun) ->
             error({excess_data, MapLeft})
     end.
 
--spec to_thrift_value(Type :: field_type(), field_native_value(Type), name_mapping_fun()) -> field_thrift_value(Type).
+-spec to_thrift_value(Type :: field_type(), field_native_value(Type), name_mapping_fun()) ->
+    field_thrift_value(Type).
 to_thrift_value({struct, struct, {Mod, Name}}, V = #{}, NameFun) ->
     {struct, _, StructDef} = Mod:struct_info(Name),
     Acc = erlang:make_tuple(length(StructDef) + 1, undefined, [{1, Mod:record_name(Name)}]),
