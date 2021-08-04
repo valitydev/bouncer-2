@@ -85,6 +85,8 @@ to_thrift_value(i32, V, _NameFun) ->
 to_thrift_value(i16, V, _NameFun) ->
     V;
 to_thrift_value(byte, V, _NameFun) ->
+    V;
+to_thrift_value(bool, V, _NameFun) ->
     V.
 
 from_thrift_struct(StructDef, Struct) ->
@@ -120,6 +122,8 @@ from_thrift_value(i32, V) ->
 from_thrift_value(i16, V) ->
     V;
 from_thrift_value(byte, V) ->
+    V;
+from_thrift_value(bool, V) ->
     V.
 
 identity(V) ->
