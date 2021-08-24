@@ -10,4 +10,4 @@ From the service's point of view a **ruleset id** is a path to OPA document that
 
 ## Things to keep in mind
 
-* When upgrading service to a newer Erlang OTP release please be aware of potential breakages in `bouncer_audit_log` not strictly related to usual API deprecations and removals which is an essintial part of a release. That is because this module relies on some OTP libraries' interal implementation details. See module-level notes for additional details.
+* When upgrading service to a newer Erlang OTP release please be aware of potential breakages in `bouncer_audit_log` not strictly related to usual API deprecations and removals which is an essintial part of a release. That is because this module relies on some OTP libraries' internal implementation details. See module-level notes for additional details.
