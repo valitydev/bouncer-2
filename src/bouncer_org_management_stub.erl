@@ -21,8 +21,8 @@ handle_function('GetUserContext', {UserID}, _WoodyCtx, _Opts) ->
             orgs = [
                 #bctx_v1_Organization{
                     id = UserID,
-                    owner = #bctx_v1_Entity{id = UserID},
-                    party = #bctx_v1_Entity{id = UserID}
+                    owner = #bouncer_base_Entity{id = UserID},
+                    party = #bouncer_base_Entity{id = UserID}
                 }
             ]
         }

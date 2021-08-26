@@ -204,7 +204,7 @@ write_queue_contention(C) ->
         LogfileEvents = [jsx:decode(L) || L <- LogfileLines, byte_size(L) > 0],
         CompletedEvents = [
             Event
-            || Event = #{<<"judgement">> := #{<<"event">> := <<"completed">>}} <- LogfileEvents
+         || Event = #{<<"judgement">> := #{<<"event">> := <<"completed">>}} <- LogfileEvents
         ],
         ?assertEqual(length(Succeeded), length(CompletedEvents))
     after

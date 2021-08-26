@@ -106,8 +106,10 @@ get_stub_handler_specs(ServiceOpts) ->
     [
         {
             maps:get(path, OrgManagementStub, <<"/v1/org_management_stub">>),
-            {{orgmgmt_auth_context_provider_thrift, 'AuthContextProvider'},
-                bouncer_org_management_stub}
+            {
+                {orgmgmt_auth_context_provider_thrift, 'AuthContextProvider'},
+                bouncer_org_management_stub
+            }
         }
     ].
 
