@@ -9,8 +9,6 @@ erl_crash.dump
 \#*
 .\#*
 .tags*
-Dockerfile
-docker-compose.yml
 rebar3.crashdump
 /_checkouts/
 /test/policies/bundle.tar.gz
