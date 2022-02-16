@@ -1,6 +1,6 @@
 -module(ct_gun_event_h).
 
--behavior(gun_event).
+-behaviour(gun_event).
 
 -export([init/2]).
 -export([domain_lookup_start/2]).
