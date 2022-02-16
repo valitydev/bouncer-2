@@ -26,7 +26,6 @@
 -export([ws_send_frame_start/2]).
 -export([ws_send_frame_end/2]).
 -export([protocol_changed/2]).
--export([transport_changed/2]).
 -export([origin_changed/2]).
 -export([cancel/2]).
 -export([disconnect/2]).
@@ -152,11 +151,6 @@ ws_send_frame_end(Event, State) ->
 -spec protocol_changed(gun_event:protocol_changed_event(), st()) -> st().
 protocol_changed(Event, State) ->
     _ = ct:pal("~p [gun] protocol changed: ~p", [self(), Event]),
-    State.
-
--spec transport_changed(gun_event:transport_changed_event(), st()) -> st().
-transport_changed(Event, State) ->
-    _ = ct:pal("~p [gun] transport changed: ~p", [self(), Event]),
     State.
 
 -spec origin_changed(gun_event:origin_changed_event(), st()) -> st().

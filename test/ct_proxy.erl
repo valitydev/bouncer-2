@@ -72,7 +72,7 @@ mode(Proxy, Scope, Mode) when is_pid(Proxy) ->
 
 -spec stop(proxy()) -> ok.
 stop(Proxy) when is_pid(Proxy) ->
-    proc_lib:stop(Proxy, shutdown).
+    proc_lib:stop(Proxy, shutdown, 1000).
 
 %%
 
@@ -240,10 +240,10 @@ loop_proxy_relay(St = #proxy{insock = InSock, upsock = UpSock}) ->
     ok = ranch_tcp:setopts(InSock, ?PROXY_SOCKET_OPTS),
     receive
         {_, InSock, Data} ->
-            ranch_tcp:send(UpSock, Data),
+            ok = ranch_tcp:send(UpSock, Data),
             loop_proxy_relay(St);
         {_, UpSock, Data} ->
-            ranch_tcp:send(InSock, Data),
+            ok = ranch_tcp:send(InSock, Data),
             loop_proxy_relay(St);
         {tcp_closed, UpSock} ->
             terminate(St);
