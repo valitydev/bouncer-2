@@ -157,7 +157,7 @@ write_error_fails_request(C) ->
     Client = mk_client(C1),
     try
         ok = file:delete(Filename),
-        ok = file:change_mode(Dirname, 8#555),
+        ok = file:del_dir(Dirname),
         ?assertError(
             % NOTE
             % The `_Reason` here may be either `result_unexpected` or `result_unknown`, depending
