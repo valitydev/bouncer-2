@@ -32,6 +32,10 @@ init([]) ->
     EventHandlers = genlib_app:env(?MODULE, woody_event_handlers, [woody_event_handler_default]),
     Healthcheck = enable_health_logging(genlib_app:env(?MODULE, health_check, #{})),
     {OpaClient, OpaClientSpec} = bouncer_opa_client:init(get_opa_opts()),
+    AdditionalRoutes = [
+        erl_health_handle:get_route(Healthcheck),
+        get_prometheus_route()
+    ],
     WoodySpec = woody_server:child_spec(
         ?MODULE,
         #{
@@ -44,7 +48,7 @@ init([]) ->
             handlers =>
                 get_handler_specs(ServiceOpts, AuditPulse, OpaClient) ++
                 get_stub_handler_specs(ServiceOpts),
-            additional_routes => [erl_health_handle:get_route(Healthcheck)]
+            additional_routes => AdditionalRoutes
         }
     ),
     {ok, {
@@ -126,3 +130,7 @@ enable_health_logging(Check) ->
         fun(_, Runner) -> #{runner => Runner, event_handler => EvHandler} end,
         Check
     ).
+
+-spec get_prometheus_route() -> {iodata(), module(), _Opts :: any()}.
+get_prometheus_route() ->
+    {"/metrics/[:registry]", prometheus_cowboy2_handler, []}.
