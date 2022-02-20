@@ -16,7 +16,7 @@ services:
       opa:
         condition: service_healthy
     ports:
-      - "8022:8022"
+      - "8022"
     command: /sbin/init
 
   opa:

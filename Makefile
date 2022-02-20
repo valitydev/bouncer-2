@@ -3,8 +3,6 @@
 # For example, to run with podman put `DOCKER=podman` there.
 -include Makefile.env
 
--include .env
-
 # NOTE
 # Variables specified in `.env` file are used to pick and setup specific
 # component versions, both when building a development image and when running
