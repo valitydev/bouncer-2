@@ -1,0 +1,41 @@
+services:
+
+  testrunner:
+    image: $DEV_IMAGE_TAG
+    build:
+      dockerfile: Dockerfile.dev
+      context: .
+      args:
+        OTP_VERSION: $OTP_VERSION
+        THRIFT_VERSION: $THRIFT_VERSION
+    volumes:
+      - .:$PWD
+    hostname: $SERVICE_NAME
+    working_dir: $PWD
+    depends_on:
+      opa:
+        condition: service_healthy
+    ports:
+      - "8022"
+    command: /sbin/init
+
+  opa:
+    image: openpolicyagent/opa:${OPA_VERSION}-debug
+    entrypoint: ["sh", "-c"]
+    ports:
+      - "8181"
+    command: ["cd /var/opa/policies &&
+               /opa build . &&
+               /opa run
+                 --server
+                 --addr :8181
+                 --set decision_logs.console=true
+                 --bundle bundle.tar.gz
+               "]
+    volumes:
+      - ./test/policies:/var/opa/policies:rw
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--tries=1", "--spider", "http://localhost:8181/"]
+      interval: 5s
+      timeout: 1s
+      retries: 5

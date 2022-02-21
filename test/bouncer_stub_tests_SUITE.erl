@@ -28,7 +28,7 @@
 -define(OPA_ENDPOINT, {?OPA_HOST, 8181}).
 -define(API_RULESET_ID, "service/authz/api").
 
--spec all() -> [atom()].
+-spec all() -> [{group, group_name()}].
 all() ->
     [
         {group, general}
@@ -108,7 +108,7 @@ stop_bouncer(C) ->
 init_per_testcase(Name, C) ->
     [{testcase, Name} | C].
 
--spec end_per_testcase(atom(), config()) -> config().
+-spec end_per_testcase(atom(), config()) -> ok.
 end_per_testcase(_Name, _C) ->
     ok.
 

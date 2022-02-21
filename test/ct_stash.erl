@@ -44,11 +44,11 @@ call(Pid, Msg) ->
 
 %%% gen_server callbacks
 
--spec init(term()) -> {ok, atom()}.
+-spec init(term()) -> {ok, map()}.
 init(_) ->
     {ok, #{}}.
 
--spec handle_call(term(), pid(), atom()) -> {reply, atom(), atom()}.
+-spec handle_call(term(), {pid(), term()}, term()) -> {reply, term(), term()}.
 handle_call({append, Key, Entry}, _From, State) ->
     Entries = maps:get(Key, State, []),
     State1 = maps:put(Key, [Entry | Entries], State),

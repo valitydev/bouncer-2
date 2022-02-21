@@ -62,7 +62,7 @@ end_per_suite(C) ->
 init_per_testcase(Name, C) ->
     [{testcase, Name} | C].
 
--spec end_per_testcase(testcase_name(), config()) -> config().
+-spec end_per_testcase(testcase_name(), config()) -> ok.
 end_per_testcase(_Name, _C) ->
     ok.
 
@@ -157,7 +157,7 @@ write_error_fails_request(C) ->
     Client = mk_client(C1),
     try
         ok = file:delete(Filename),
-        ok = file:change_mode(Dirname, 8#555),
+        ok = file:del_dir(Dirname),
         ?assertError(
             % NOTE
             % The `_Reason` here may be either `result_unexpected` or `result_unknown`, depending
