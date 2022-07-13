@@ -1,6 +1,6 @@
 -module(bouncer_context_v1).
 
--include_lib("bouncer_proto/include/bouncer_context_v1_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_ctx_v1_thrift.hrl").
 
 -type vsn() :: integer().
 -type format() :: thrift.
@@ -19,10 +19,10 @@
 %%
 
 -define(THRIFT_TYPE,
-    {struct, struct, {bouncer_context_v1_thrift, 'ContextFragment'}}
+    {struct, struct, {bouncer_ctx_v1_thrift, 'ContextFragment'}}
 ).
 
--type thrift_ctx_fragment() :: bouncer_context_v1_thrift:'ContextFragment'().
+-type thrift_ctx_fragment() :: bouncer_ctx_v1_thrift:'ContextFragment'().
 
 -spec decode(format(), _Content :: binary()) ->
     {ok, bouncer_context:ctx(), metadata()} | {error, _Reason}.
@@ -41,31 +41,31 @@ decode(thrift, Content) ->
     end.
 
 -spec from_thrift(thrift_ctx_fragment()) -> {ok, bouncer_context:ctx(), metadata()}.
-from_thrift(#bctx_v1_ContextFragment{} = Ctx0) ->
+from_thrift(#ctx_v1_ContextFragment{} = Ctx0) ->
     Ctx1 = try_upgrade(Ctx0),
     Metadata = #{
         version => #{
-            current => Ctx1#bctx_v1_ContextFragment.vsn,
-            original => Ctx0#bctx_v1_ContextFragment.vsn,
-            latest => ?BCTX_V1_HEAD
+            current => Ctx1#ctx_v1_ContextFragment.vsn,
+            original => Ctx0#ctx_v1_ContextFragment.vsn,
+            latest => ?CTX_V1_HEAD
         }
     },
     {ok, from_thrift_context(Ctx1), Metadata}.
 
 from_thrift_context(Ctx) ->
     {struct, _, [_VsnField | StructDef]} =
-        bouncer_context_v1_thrift:struct_info('ContextFragment'),
+        bouncer_ctx_v1_thrift:struct_info('ContextFragment'),
     % NOTE
     % This 3 refers to the first data field in a ContextFragment, after version field.
     bouncer_thrift:from_thrift_struct(StructDef, Ctx, 3, #{}).
 
 -spec try_upgrade(thrift_ctx_fragment()) -> thrift_ctx_fragment().
-try_upgrade(#bctx_v1_ContextFragment{vsn = 1} = Ctx) ->
+try_upgrade(#ctx_v1_ContextFragment{vsn = 1} = Ctx) ->
     % no legacy data producers
     % legacy structures have been removed
     % nothing to update
-    Ctx#bctx_v1_ContextFragment{vsn = ?BCTX_V1_HEAD};
-try_upgrade(#bctx_v1_ContextFragment{vsn = ?BCTX_V1_HEAD} = Ctx) ->
+    Ctx#ctx_v1_ContextFragment{vsn = ?CTX_V1_HEAD};
+try_upgrade(#ctx_v1_ContextFragment{vsn = ?CTX_V1_HEAD} = Ctx) ->
     Ctx.
 
 %%
@@ -83,5 +83,5 @@ encode(thrift, Context) ->
 
 -spec to_thrift(bouncer_context:ctx()) -> thrift_ctx_fragment() | no_return().
 to_thrift(Context) ->
-    {struct, _, StructDef} = bouncer_context_v1_thrift:struct_info('ContextFragment'),
-    bouncer_thrift:to_thrift_struct(StructDef, Context, #bctx_v1_ContextFragment{}).
+    {struct, _, StructDef} = bouncer_ctx_v1_thrift:struct_info('ContextFragment'),
+    bouncer_thrift:to_thrift_struct(StructDef, Context, #ctx_v1_ContextFragment{}).

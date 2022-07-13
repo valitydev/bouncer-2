@@ -1,6 +1,8 @@
 -module(bouncer_arbiter_handler).
 
--include_lib("bouncer_proto/include/bouncer_decisions_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_decision_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_ctx_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_rstn_thrift.hrl").
 
 %% Woody handler
 
@@ -56,10 +58,10 @@ handle_judge(RulesetID, ContextIn, St0) ->
             {ok, encode_judgement(Judgement)};
         {error, ruleset_notfound = Reason} ->
             ok = handle_judgement_beat({failed, Reason}, St2),
-            throw({woody, business, #bdcs_RulesetNotFound{}});
+            throw({woody, business, #decision_RulesetNotFound{}});
         {error, {ruleset_invalid, _} = Reason} ->
             ok = handle_judgement_beat({failed, Reason}, St2),
-            throw({woody, business, #bdcs_InvalidRuleset{}});
+            throw({woody, business, #decision_InvalidRuleset{}});
         {error, Reason} ->
             handle_network_error(Reason, St2)
     end.
@@ -77,32 +79,32 @@ handle_network_error({unknown, Reason} = Error, St) ->
 -type fragment_id() :: binary().
 -type fragment_metadata() :: #{atom() => _}.
 
--type thrift_judgement() :: bouncer_decisions_thrift:'Judgement'().
--type thrift_context() :: bouncer_decisions_thrift:'Context'().
--type thrift_fragment() :: bouncer_context_thrift:'ContextFragment'().
--type thrift_fragment_type() :: bouncer_context_thrift:'ContextFragmentType'().
+-type thrift_judgement() :: bouncer_decision_thrift:'Judgement'().
+-type thrift_context() :: bouncer_decision_thrift:'Context'().
+-type thrift_fragment() :: bouncer_ctx_thrift:'ContextFragment'().
+-type thrift_fragment_type() :: bouncer_ctx_thrift:'ContextFragmentType'().
 
 -spec encode_judgement(bouncer_arbiter:judgement()) -> thrift_judgement().
 encode_judgement({Resolution, _Assertions}) ->
-    #bdcs_Judgement{
+    #decision_Judgement{
         resolution = encode_resolution(Resolution)
     }.
 
 encode_resolution(allowed) ->
-    {allowed, #bdcs_ResolutionAllowed{}};
+    {allowed, #decision_ResolutionAllowed{}};
 encode_resolution(forbidden) ->
-    {forbidden, #bdcs_ResolutionForbidden{}};
+    {forbidden, #decision_ResolutionForbidden{}};
 encode_resolution({restricted, Restrictions}) ->
-    {restricted, #bdcs_ResolutionRestricted{
+    {restricted, #decision_ResolutionRestricted{
         restrictions = encode_restrictions(Restrictions)
     }}.
 
 encode_restrictions(Restrictions) ->
-    {struct, _, StructDef} = bouncer_restriction_thrift:struct_info('Restrictions'),
-    bouncer_thrift:json_to_thrift_struct(StructDef, Restrictions, #brstn_Restrictions{}).
+    {struct, _, StructDef} = bouncer_rstn_thrift:struct_info('Restrictions'),
+    bouncer_thrift:json_to_thrift_struct(StructDef, Restrictions, #rstn_Restrictions{}).
 
 -spec decode_context(thrift_context(), st()) -> {bouncer_context:ctx(), st()}.
-decode_context(#bdcs_Context{fragments = FragmentsIn}, St0) ->
+decode_context(#decision_Context{fragments = FragmentsIn}, St0) ->
     % 1. Decode each fragment.
     {Fragments, St1} = decode_fragments(FragmentsIn, St0),
     % 2. Merge each decoded context into an empty context. Accumulate conflicts associated with
@@ -131,7 +133,7 @@ decode_context(#bdcs_Context{fragments = FragmentsIn}, St0) ->
             % системы рано или поздно они где-нибудь появятся), быть может стоит это сделать
             % сразу?
             ok = handle_judgement_beat({failed, {conflicting_context, Conflicts}}, St1),
-            throw({woody, business, #bdcs_InvalidContext{}})
+            throw({woody, business, #decision_InvalidContext{}})
     end.
 
 -spec decode_fragments(#{fragment_id() => thrift_fragment()}, st()) ->
@@ -139,8 +141,8 @@ decode_context(#bdcs_Context{fragments = FragmentsIn}, St0) ->
 decode_fragments(Fragments, St0) ->
     {Ctxs, Errors, PulseMeta} = maps:fold(
         fun(ID, Fragment, {CtxAcc, ErrorAcc, PulseMetaAcc}) ->
-            Type = Fragment#bctx_ContextFragment.type,
-            Content = genlib:define(Fragment#bctx_ContextFragment.content, <<>>),
+            Type = Fragment#ctx_ContextFragment.type,
+            Content = genlib:define(Fragment#ctx_ContextFragment.content, <<>>),
             case decode_fragment(Type, Content) of
                 {ok, Ctx, Meta} ->
                     PulseMeta = #{
@@ -170,7 +172,7 @@ decode_fragments(Fragments, St0) ->
             {Ctxs, St1};
         _ ->
             ok = handle_judgement_beat({failed, {malformed_context, Errors}}, St1),
-            throw({woody, business, #bdcs_InvalidContext{}})
+            throw({woody, business, #decision_InvalidContext{}})
     end.
 
 -spec decode_fragment(thrift_fragment_type(), _Content :: binary()) ->
