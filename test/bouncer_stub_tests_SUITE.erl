@@ -1,9 +1,9 @@
 %% TODO delete after org_management is done
 -module(bouncer_stub_tests_SUITE).
 
--include_lib("common_test/include/ct.hrl").
 -include_lib("stdlib/include/assert.hrl").
--include_lib("org_management_proto/include/orgmgmt_context_thrift.hrl").
+
+-include_lib("bouncer_proto/include/bouncer_ctx_thrift.hrl").
 
 -export([all/0]).
 -export([groups/0]).
@@ -26,7 +26,6 @@
 
 -define(OPA_HOST, "opa").
 -define(OPA_ENDPOINT, {?OPA_HOST, 8181}).
--define(API_RULESET_ID, "service/authz/api").
 
 -spec all() -> [{group, group_name()}].
 all() ->
@@ -119,7 +118,7 @@ orgmgmt_get_user_context_ok(C) ->
     Client = mk_client(C),
     UserID = <<"UserID">>,
     ?assertMatch(
-        #bctx_ContextFragment{
+        #ctx_ContextFragment{
             type = v1_thrift_binary,
             content = _Content
         },
@@ -148,4 +147,4 @@ call(ServiceName, Fn, Args, {WoodyCtx, ServiceURLs}) ->
     end.
 
 get_service_spec(org_management) ->
-    {orgmgmt_auth_context_provider_thrift, 'AuthContextProvider'}.
+    {orgmgmt_authctx_provider_thrift, 'AuthContextProvider'}.

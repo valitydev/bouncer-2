@@ -19,7 +19,7 @@
 
 %%
 
--include_lib("bouncer_proto/include/bouncer_decisions_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_decision_thrift.hrl").
 
 -define(CONFIG(Key, C), (element(2, lists:keyfind(Key, 1, C)))).
 -define(OPA_HOST, "opa").
@@ -68,7 +68,7 @@ end_per_testcase(_Name, C) ->
 
 -spec basic_metrics_test(config()) -> _.
 basic_metrics_test(C) ->
-    _ = call_judge("service/authz/api", #bdcs_Context{fragments = #{}}, mk_client(C)),
+    _ = call_judge("service/authz/api", #decision_Context{fragments = #{}}, mk_client(C)),
     _ = timer:sleep(100),
     ?assertEqual(25, get_metric([gunner, config, connections, max])),
     ?assertEqual(5, get_metric([gunner, config, connections, min])),
@@ -112,7 +112,7 @@ call(ServiceName, Fn, Args, {WoodyCtx, ServiceURLs}) ->
     end.
 
 get_service_spec(arbiter) ->
-    {bouncer_decisions_thrift, 'Arbiter'}.
+    {bouncer_decision_thrift, 'Arbiter'}.
 
 %%
 
