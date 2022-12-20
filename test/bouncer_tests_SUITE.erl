@@ -33,7 +33,8 @@
 
 -export([handle_beat/3]).
 
--include_lib("bouncer_proto/include/bouncer_decisions_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_decision_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_ctx_thrift.hrl").
 
 -type config() :: ct_helper:config().
 -type group_name() :: atom().
@@ -166,8 +167,8 @@ end_per_testcase(_Name, _C) ->
 
 %%
 
--define(CONTEXT(Fragments), #bdcs_Context{fragments = Fragments}).
--define(JUDGEMENT(Resolution), #bdcs_Judgement{resolution = Resolution}).
+-define(CONTEXT(Fragments), #decision_Context{fragments = Fragments}).
+-define(JUDGEMENT(Resolution), #decision_Judgement{resolution = Resolution}).
 
 -spec missing_ruleset_notfound(config()) -> ok.
 -spec incorrect_ruleset_invalid1(config()) -> ok.
@@ -182,7 +183,7 @@ missing_ruleset_notfound(C) ->
     Client = mk_client(C),
     MissingRulesetID = "missing_ruleset",
     ?assertThrow(
-        #bdcs_RulesetNotFound{},
+        #decision_RulesetNotFound{},
         call_judge(MissingRulesetID, ?CONTEXT(#{}), Client)
     ),
     ?assertMatch(
@@ -193,7 +194,7 @@ missing_ruleset_notfound(C) ->
 incorrect_ruleset_invalid1(C) ->
     Client = mk_client(C),
     ?assertThrow(
-        #bdcs_InvalidRuleset{},
+        #decision_InvalidRuleset{},
         call_judge("trivial/incorrect1", ?CONTEXT(#{}), Client)
     ),
     ?assertMatch(
@@ -208,7 +209,7 @@ incorrect_ruleset_invalid1(C) ->
 incorrect_ruleset_invalid2(C) ->
     Client = mk_client(C),
     ?assertThrow(
-        #bdcs_InvalidRuleset{},
+        #decision_InvalidRuleset{},
         call_judge("trivial/incorrect2", ?CONTEXT(#{}), Client)
     ),
     ?assertMatch(
@@ -223,7 +224,7 @@ incorrect_ruleset_invalid2(C) ->
 incorrect_ruleset_invalid3(C) ->
     Client = mk_client(C),
     ?assertThrow(
-        #bdcs_InvalidRuleset{},
+        #decision_InvalidRuleset{},
         call_judge("trivial/incorrect3", ?CONTEXT(#{}), Client)
     ),
     ?assertMatch(
@@ -237,10 +238,10 @@ incorrect_ruleset_invalid3(C) ->
 
 missing_content_invalid_context(C) ->
     Client = mk_client(C),
-    NoContentFragment = #bctx_ContextFragment{type = v1_thrift_binary},
+    NoContentFragment = #ctx_ContextFragment{type = v1_thrift_binary},
     Context = ?CONTEXT(#{<<"missing">> => NoContentFragment}),
     ?assertThrow(
-        #bdcs_InvalidContext{},
+        #decision_InvalidContext{},
         call_judge(?API_RULESET_ID, Context, Client)
     ),
     ?assertMatch(
@@ -255,10 +256,10 @@ missing_content_invalid_context(C) ->
 junk_content_invalid_context(C) ->
     Client = mk_client(C),
     Junk = <<"STOP RIGHT THERE YOU CRIMINAL SCUM!">>,
-    JunkFragment = #bctx_ContextFragment{type = v1_thrift_binary, content = Junk},
+    JunkFragment = #ctx_ContextFragment{type = v1_thrift_binary, content = Junk},
     Context = ?CONTEXT(#{<<"missing">> => JunkFragment}),
     ?assertThrow(
-        #bdcs_InvalidContext{},
+        #decision_InvalidContext{},
         call_judge(?API_RULESET_ID, Context, Client)
     ),
     ?assertMatch(
@@ -295,7 +296,7 @@ conflicting_context_invalid(C) ->
         <<"frag2">> => mk_ctx_v1_fragment(Fragment2)
     }),
     ?assertThrow(
-        #bdcs_InvalidContext{},
+        #decision_InvalidContext{},
         call_judge(?API_RULESET_ID, Context, Client)
     ),
     ?assertEqual(
@@ -344,7 +345,7 @@ distinct_sets_context_valid(C) ->
         <<"frag2">> => mk_ctx_v1_fragment(Fragment2)
     }),
     ?assertMatch(
-        #bdcs_Judgement{},
+        #decision_Judgement{},
         call_judge(?API_RULESET_ID, Context, Client)
     ),
     ?assertMatch(
@@ -380,7 +381,7 @@ restricted_search_invoices_shop_manager(C) ->
     ]),
     Context = ?CONTEXT(#{<<"root">> => mk_ctx_v1_fragment(Fragment)}),
     ?assertMatch(
-        ?JUDGEMENT({restricted, #bdcs_ResolutionRestricted{}}),
+        ?JUDGEMENT({restricted, #decision_ResolutionRestricted{}}),
         call_judge(?API_RULESET_ID, Context, Client)
     ),
     ?assertMatch(
@@ -400,7 +401,7 @@ forbidden_expired(C) ->
     }),
     Context = ?CONTEXT(#{<<"root">> => mk_ctx_v1_fragment(Fragment)}),
     ?assertMatch(
-        ?JUDGEMENT({forbidden, #bdcs_ResolutionForbidden{}}),
+        ?JUDGEMENT({forbidden, #decision_ResolutionForbidden{}}),
         call_judge(?API_RULESET_ID, Context, Client)
     ),
     ?assertMatch(
@@ -418,7 +419,7 @@ forbidden_blacklisted_ip(C) ->
     ]),
     Context = ?CONTEXT(#{<<"root">> => mk_ctx_v1_fragment(Fragment)}),
     ?assertMatch(
-        ?JUDGEMENT({forbidden, #bdcs_ResolutionForbidden{}}),
+        ?JUDGEMENT({forbidden, #decision_ResolutionForbidden{}}),
         call_judge(?API_RULESET_ID, Context, Client)
     ),
     ?assertMatch(
@@ -430,7 +431,7 @@ forbidden_w_empty_context(C) ->
     Client1 = mk_client(C),
     EmptyFragment = mk_ctx_v1_fragment(#{}),
     ?assertMatch(
-        ?JUDGEMENT({forbidden, #bdcs_ResolutionForbidden{}}),
+        ?JUDGEMENT({forbidden, #decision_ResolutionForbidden{}}),
         call_judge(?API_RULESET_ID, ?CONTEXT(#{}), Client1)
     ),
     ?assertMatch(
@@ -439,7 +440,7 @@ forbidden_w_empty_context(C) ->
     ),
     Client2 = mk_client(C),
     ?assertMatch(
-        ?JUDGEMENT({forbidden, #bdcs_ResolutionForbidden{}}),
+        ?JUDGEMENT({forbidden, #decision_ResolutionForbidden{}}),
         call_judge(?API_RULESET_ID, ?CONTEXT(#{<<"empty">> => EmptyFragment}), Client2)
     ),
     ?assertMatch(
@@ -617,7 +618,7 @@ mk_ordset(L) ->
 
 mk_ctx_v1_fragment(Context) ->
     {ok, Content} = bouncer_context_v1:encode(thrift, Context),
-    #bctx_ContextFragment{type = v1_thrift_binary, content = Content}.
+    #ctx_ContextFragment{type = v1_thrift_binary, content = Content}.
 
 %%
 
@@ -643,7 +644,7 @@ call(ServiceName, Fn, Args, {WoodyCtx, ServiceURLs}) ->
     end.
 
 get_service_spec(arbiter) ->
-    {bouncer_decisions_thrift, 'Arbiter'}.
+    {bouncer_decision_thrift, 'Arbiter'}.
 
 %%
 

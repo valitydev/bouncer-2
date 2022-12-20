@@ -1,6 +1,5 @@
 -module(bouncer_audit_tests_SUITE).
 
--include_lib("common_test/include/ct.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 -export([all/0]).
@@ -15,7 +14,7 @@
 -export([write_error_fails_request/1]).
 -export([write_queue_contention/1]).
 
--include_lib("bouncer_proto/include/bouncer_decisions_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_decision_thrift.hrl").
 
 -type config() :: ct_helper:config().
 -type testcase_name() :: atom().
@@ -68,7 +67,7 @@ end_per_testcase(_Name, _C) ->
 
 %%
 
--define(CONTEXT(Fragments), #bdcs_Context{fragments = Fragments}).
+-define(CONTEXT(Fragments), #decision_Context{fragments = Fragments}).
 
 -spec invalid_config_fails_start(config()) -> ok.
 -spec unrecognized_config_fails_start(config()) -> ok.
@@ -251,7 +250,7 @@ call(ServiceName, Fn, Args, {WoodyCtx, ServiceURLs}) ->
     end.
 
 get_service_spec(arbiter) ->
-    {bouncer_decisions_thrift, 'Arbiter'}.
+    {bouncer_decision_thrift, 'Arbiter'}.
 
 %%
 
