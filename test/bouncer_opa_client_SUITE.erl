@@ -18,7 +18,7 @@
 -define(OPA_ENDPOINT_RESOLVE, {{resolve, dns, ?OPA_HOST, #{pick => random}}, 8181}).
 -define(OPA_ENDPOINT, {?OPA_HOST, 8181}).
 
--spec all() -> [].
+-spec all() -> list(atom()).
 all() ->
     [
         request_document_not_found
