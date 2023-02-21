@@ -166,3 +166,20 @@ normalize_path(P) when is_binary(P) ->
     normalize_path(<<$/, P/binary>>);
 normalize_path(P) ->
     normalize_path(iolist_to_binary(P)).
+
+%%
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+-spec test() -> _.
+
+-spec do_request_document_with_negative_timeout_leftover_test() -> ok.
+do_request_document_with_negative_timeout_leftover_test() ->
+    Headers = #{},
+    Client = #{endpoint => localhost, request_timeout => 100, connect_timeout => 100},
+    Result = do_request_document(-1, localhost, <<"whatever/path">>, <<"{}">>, Headers, Client),
+    ?assertEqual({error, {unavailable, timeout}}, Result).
+
+-endif.
