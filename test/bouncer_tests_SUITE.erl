@@ -28,6 +28,7 @@
 -export([connect_failed_means_unavailable/1]).
 -export([connect_timeout_means_unavailable/1]).
 -export([request_timeout_means_unknown/1]).
+-export([endpoint_resolve_timeout_means_unavailable/1]).
 
 -behaviour(bouncer_arbiter_pulse).
 
@@ -79,7 +80,8 @@ groups() ->
         {network_error_mapping, [], [
             connect_failed_means_unavailable,
             connect_timeout_means_unavailable,
-            request_timeout_means_unknown
+            request_timeout_means_unknown,
+            endpoint_resolve_timeout_means_unavailable
         ]}
     ].
 
@@ -158,10 +160,16 @@ stop_bouncer(C) ->
     ).
 
 -spec init_per_testcase(atom(), config()) -> config().
+init_per_testcase(endpoint_resolve_timeout_means_unavailable = Name, C) ->
+    meck:new(gunner_resolver, [no_link, passthrough]),
+    [{testcase, Name} | C];
 init_per_testcase(Name, C) ->
     [{testcase, Name} | C].
 
 -spec end_per_testcase(atom(), config()) -> ok.
+end_per_testcase(endpoint_resolve_timeout_means_unavailable, _C) ->
+    meck:unload(gunner_resolver),
+    ok;
 end_per_testcase(_Name, _C) ->
     ok.
 
@@ -508,6 +516,7 @@ format_ts(Ts, Unit) ->
 -spec connect_failed_means_unavailable(config()) -> ok.
 -spec connect_timeout_means_unavailable(config()) -> ok.
 -spec request_timeout_means_unknown(config()) -> ok.
+-spec endpoint_resolve_timeout_means_unavailable(config()) -> ok.
 
 connect_failed_means_unavailable(C) ->
     C1 = start_bouncer(
@@ -579,6 +588,45 @@ request_timeout_means_unknown(C) ->
             [
                 {judgement, started},
                 {judgement, {failed, {unknown, timeout}}}
+            ],
+            flush_beats(Client, C1)
+        )
+    after
+        stop_bouncer(C1)
+    end.
+
+endpoint_resolve_timeout_means_unavailable(C) ->
+    ok = meck:expect(gunner_resolver, resolve_endpoint, fun(Endpoint, Opts) ->
+        Timeout = maps:get(timeout, Opts),
+        timer:sleep(Timeout + 10),
+        meck:passthrough([Endpoint, Opts])
+    end),
+    %% Don't need actual OPA
+    C1 = start_bouncer(
+        [
+            {opa, #{
+                %% But we need an endpoint resolution try
+                endpoint => ?OPA_ENDPOINT_RESOLVE,
+                pool_opts => #{
+                    connection_opts => #{
+                        transport => tcp,
+                        event_handler => {ct_gun_event_h, []}
+                    }
+                }
+            }}
+        ],
+        C
+    ),
+    Client = mk_client(C1),
+    try
+        ?assertError(
+            {woody_error, {external, resource_unavailable, <<"timeout">>}},
+            call_judge(?API_RULESET_ID, ?CONTEXT(#{}), Client)
+        ),
+        ?assertMatch(
+            [
+                {judgement, started},
+                {judgement, {failed, {unavailable, timeout}}}
             ],
             flush_beats(Client, C1)
         )

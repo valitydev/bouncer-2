@@ -86,20 +86,7 @@ request_document(RulesetID, Input, Client) ->
     try
         ResolvedEndpoint = resolve_endpoint(Endpoint, RequestTimeout),
         TimeoutLeft = Deadline - erlang:monotonic_time(millisecond),
-        GunnerOpts = make_gunner_opts(TimeoutLeft, Client),
-        %% Trying the synchronous API first
-        case gunner:post(?GUNNER_POOL_ID, ResolvedEndpoint, Path, Body, Headers, GunnerOpts) of
-            {ok, 200, _, Response} when is_binary(Response) ->
-                decode_document(Response);
-            {ok, 404, _, _} ->
-                {error, notfound};
-            {ok, Code, _, Response} ->
-                {error, {unknown, {Code, Response}}};
-            {error, {unknown, Reason}} ->
-                {error, {unknown, Reason}};
-            {error, Reason} ->
-                {error, {unavailable, Reason}}
-        end
+        do_request_document(TimeoutLeft, ResolvedEndpoint, Path, Body, Headers, Client)
     catch
         throw:{resolve_failed, ResolvError} ->
             {error, {unavailable, ResolvError}}
@@ -117,6 +104,25 @@ decode_document(Response) ->
     end.
 
 %%
+do_request_document(TimeoutLeft, _ResolvedEndpoint, _Path, _Body, _Headers, _Client) when
+    TimeoutLeft =< 0
+->
+    {error, {unavailable, timeout}};
+do_request_document(TimeoutLeft, ResolvedEndpoint, Path, Body, Headers, Client) ->
+    GunnerOpts = make_gunner_opts(TimeoutLeft, Client),
+    %% Trying the synchronous API first
+    case gunner:post(?GUNNER_POOL_ID, ResolvedEndpoint, Path, Body, Headers, GunnerOpts) of
+        {ok, 200, _, Response} when is_binary(Response) ->
+            decode_document(Response);
+        {ok, 404, _, _} ->
+            {error, notfound};
+        {ok, Code, _, Response} ->
+            {error, {unknown, {Code, Response}}};
+        {error, {unknown, Reason}} ->
+            {error, {unknown, Reason}};
+        {error, Reason} ->
+            {error, {unavailable, Reason}}
+    end.
 
 resolve_endpoint({{resolve, dns, Hostname, Opts}, Port}, Timeout) ->
     case gunner_resolver:resolve_endpoint({Hostname, Port}, make_resolver_opts(Timeout, Opts)) of
