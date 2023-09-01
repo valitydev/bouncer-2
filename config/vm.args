@@ -1,3 +1,5 @@
 -sname bouncer
 
 -setcookie bouncer_cookie
+
+-kernel inetrc '"config/erl_inetrc"'
