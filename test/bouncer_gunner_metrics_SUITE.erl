@@ -102,7 +102,7 @@ call(ServiceName, Fn, Args, {WoodyCtx, ServiceURLs}) ->
     Service = get_service_spec(ServiceName),
     Opts = #{
         url => maps:get(ServiceName, ServiceURLs),
-        event_handler => scoper_woody_event_handler
+        event_handler => bouncer_woody_event_handler
     },
     case woody_client:call({Service, Fn, Args}, Opts, WoodyCtx) of
         {ok, Response} ->
