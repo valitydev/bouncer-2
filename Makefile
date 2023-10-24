@@ -40,7 +40,7 @@ DOCKER_WC_OPTIONS := -v $(PWD):$(PWD) --workdir $(PWD)
 DOCKER_WC_EXTRA_OPTIONS ?= --rm
 DOCKER_RUN = $(DOCKER) run -t $(DOCKER_WC_OPTIONS) $(DOCKER_WC_EXTRA_OPTIONS)
 
-DOCKERCOMPOSE_RUN = $(DOCKERCOMPOSE_W_ENV) run --rm $(DOCKER_WC_OPTIONS) $(TEST_CONTAINER_NAME)
+DOCKERCOMPOSE_RUN = $(DOCKERCOMPOSE_W_ENV) run --rm $(DOCKER_WC_OPTIONS)
 
 # Utility tasks
 
@@ -51,11 +51,11 @@ wc-%: dev-image
 	$(DOCKER_RUN) $(DEV_IMAGE_TAG) make $*
 
 wdeps-shell: dev-image
-	$(DOCKERCOMPOSE_RUN) su; \
+	$(DOCKERCOMPOSE_RUN) $(TEST_CONTAINER_NAME) su; \
 	$(DOCKERCOMPOSE_W_ENV) down
 
 wdeps-%: dev-image
-	$(DOCKERCOMPOSE_RUN) make $*; \
+	$(DOCKERCOMPOSE_RUN) -T $(TEST_CONTAINER_NAME) make $*; \
 	res=$$?; \
 	$(DOCKERCOMPOSE_W_ENV) down; \
 	exit $$res
