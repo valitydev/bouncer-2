@@ -31,6 +31,7 @@ services:
                  --addr :8181
                  --set decision_logs.console=true
                  --bundle bundle.tar.gz
+                 --disable-telemetry
                "]
     volumes:
       - ./test/policies:/var/opa/policies:rw
