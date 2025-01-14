@@ -156,6 +156,15 @@ write_error_fails_request(C) ->
     Client = mk_client(C1),
     try
         ok = file:delete(Filename),
+        %% FIXME Removed directory is being restored on logfile reopen
+        %% attempt.
+        %%
+        %% This behaviour started to appear somewhere in between 24.3
+        %% and 27.1 OTP versions. Thus, deletion of this directory
+        %% doesn't fail audit logging and request handling.
+        %%
+        %% See
+        %% https://github.com/erlang/otp/commit/fd4f13e1b768877146ed98101986e45b7c9cd81b#diff-d4bf7d04936f515ee21bf2ab3c1faf35b752fe7adf56c78fbb02bfa1c9a97576R497-R508
         ok = file:del_dir(Dirname),
         ?assertError(
             % NOTE
