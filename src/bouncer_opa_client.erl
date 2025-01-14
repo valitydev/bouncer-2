@@ -156,7 +156,7 @@ get_connect_timeout(PoolOpts) ->
 join_path(F1, F2) when is_binary(F1), is_binary(F2) ->
     normalize_path(genlib_string:cat(normalize_path(F1), normalize_path(F2))).
 
-normalize_path(P = <<$/, P1/binary>>) ->
+normalize_path(<<$/, P1/binary>> = P) ->
     S1 = byte_size(P1),
     case S1 > 0 andalso binary:last(P1) of
         $/ -> binary:part(P, 0, S1);

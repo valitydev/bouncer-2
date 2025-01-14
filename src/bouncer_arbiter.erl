@@ -64,7 +64,7 @@ parse_judgement(#{
 extract_assertions(Assertions) ->
     [extract_assertion(E) || E <- Assertions].
 
-extract_assertion(Assertion = #{<<"code">> := Code}) ->
+extract_assertion(#{<<"code">> := Code} = Assertion) ->
     {Code, maps:without([<<"code">>], Assertion)}.
 
 -spec get_judgement_schema() -> jesse:schema().
