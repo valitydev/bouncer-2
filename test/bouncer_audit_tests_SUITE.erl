@@ -154,18 +154,11 @@ write_error_fails_request(C) ->
         C
     ),
     Client = mk_client(C1),
+    _ = meck:new(logger_std_h, [unstick, passthrough]),
+    _ = meck:expect(logger_std_h, write, fun(_Name, sync, _Bin, HandlerState) ->
+        {{error, enoent}, HandlerState}
+    end),
     try
-        ok = file:delete(Filename),
-        %% FIXME Removed directory is being restored on logfile reopen
-        %% attempt.
-        %%
-        %% This behaviour started to appear somewhere in between 24.3
-        %% and 27.1 OTP versions. Thus, deletion of this directory
-        %% doesn't fail audit logging and request handling.
-        %%
-        %% See
-        %% https://github.com/erlang/otp/commit/fd4f13e1b768877146ed98101986e45b7c9cd81b#diff-d4bf7d04936f515ee21bf2ab3c1faf35b752fe7adf56c78fbb02bfa1c9a97576R497-R508
-        ok = file:del_dir(Dirname),
         ?assertError(
             % NOTE
             % The `_Reason` here may be either `result_unexpected` or `result_unknown`, depending
@@ -174,6 +167,7 @@ write_error_fails_request(C) ->
             call_judge(?API_RULESET_ID, ?CONTEXT(#{}), Client)
         )
     after
+        _ = meck:unload(logger_std_h),
         _ = rm_temp_dir(Dirname),
         stop_bouncer(C1)
     end.
