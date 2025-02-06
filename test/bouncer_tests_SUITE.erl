@@ -703,7 +703,7 @@ handle_beat(Beat, Metadata, StashPid) ->
 
 %%
 
-stash_beat(Beat, Metadata = #{woody_ctx := WoodyCtx}, StashPid) ->
+stash_beat(Beat, #{woody_ctx := WoodyCtx} = Metadata, StashPid) ->
     ct_stash:append(StashPid, get_trace_id(WoodyCtx), {Beat, Metadata}).
 
 flush_beats({WoodyCtx, _}, C) ->

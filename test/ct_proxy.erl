@@ -97,13 +97,13 @@ init({Upstream, Modes0, SocketOpts}) ->
     {ok, sync_mode(listen, stop, maps:get(listen, Modes), St)}.
 
 -spec handle_call(_Call, _From, st()) -> {noreply, st()}.
-handle_call(endpoint, _From, St = #st{}) ->
+handle_call(endpoint, _From, #st{} = St) ->
     {reply, get_endpoint(St), St};
-handle_call({mode, Scope, Mode}, _From, St = #st{modes = Modes}) ->
+handle_call({mode, Scope, Mode}, _From, #st{modes = Modes} = St) ->
     ModeWas = maps:get(Scope, Modes),
     StNext = sync_mode(Scope, ModeWas, Mode, St),
     {reply, ModeWas, StNext#st{modes = Modes#{Scope := Mode}}};
-handle_call({mode, Scope}, _From, St = #st{modes = Modes, upstream = Endpoint}) ->
+handle_call({mode, Scope}, _From, #st{modes = Modes, upstream = Endpoint} = St) ->
     {reply, {maps:get(Scope, Modes), Endpoint}, St};
 handle_call(_Call, _From, St) ->
     {noreply, St}.
@@ -153,25 +153,25 @@ sync_mode(listen, ignore, stop, St) ->
 sync_mode(connection, _, _, St) ->
     St.
 
-start_listener(St = #st{lsock = undefined, lsockopts = SocketOpts}) ->
+start_listener(#st{lsock = undefined, lsockopts = SocketOpts} = St) ->
     ct:pal("start_listener @ ~p", [St]),
     {ok, LSock} = ranch_tcp:listen(SocketOpts),
     St#st{lsock = LSock}.
 
-stop_listener(St = #st{lsock = LSock}) when lsock /= undefined ->
+stop_listener(#st{lsock = LSock} = St) when lsock /= undefined ->
     ct:pal("stop_listener @ ~p", [St]),
     ok = ranch_tcp:close(LSock),
     St#st{lsock = undefined}.
 
 %%
 
-start_acceptor(St = #st{acceptor = undefined, lsock = LSock}) ->
+start_acceptor(#st{acceptor = undefined, lsock = LSock} = St) ->
     ct:pal("start_acceptor @ ~p", [St]),
     Parent = self(),
     Pid = erlang:spawn_link(fun() -> loop_acceptor(Parent, LSock) end),
     St#st{acceptor = Pid}.
 
-stop_acceptor(St = #st{acceptor = Pid}) when is_pid(Pid) ->
+stop_acceptor(#st{acceptor = Pid} = St) when is_pid(Pid) ->
     ct:pal("stop_acceptor @ ~p", [St]),
     MRef = erlang:monitor(process, Pid),
     true = erlang:unlink(Pid),
@@ -210,7 +210,7 @@ spawn_proxy_connection(Parent, CSock) ->
     ProxySt = #proxy{insock = CSock, parent = Parent},
     erlang:spawn_link(fun() -> loop_proxy_connection(ProxySt) end).
 
-loop_proxy_connection(St = #proxy{insock = InSock, parent = Parent, buffer = Buffer}) ->
+loop_proxy_connection(#proxy{insock = InSock, parent = Parent, buffer = Buffer} = St) ->
     case ranch_tcp:recv(InSock, 0, ?PROXY_RECV_TIMEOUT) of
         {ok, Data} ->
             Buffer1 = <<Buffer/binary, Data/binary>>,
@@ -227,7 +227,7 @@ loop_proxy_connection(St = #proxy{insock = InSock, parent = Parent, buffer = Buf
             terminate(St)
     end.
 
-loop_proxy_relay(St = #proxy{upsock = undefined, upstream = Endpoint, buffer = Buffer}) ->
+loop_proxy_relay(#proxy{upsock = undefined, upstream = Endpoint, buffer = Buffer} = St) ->
     case remote_connect(Endpoint) of
         {ok, Socket} ->
             ok = ranch_tcp:send(Socket, Buffer),
@@ -235,7 +235,7 @@ loop_proxy_relay(St = #proxy{upsock = undefined, upstream = Endpoint, buffer = B
         {error, _Error} ->
             terminate(St)
     end;
-loop_proxy_relay(St = #proxy{insock = InSock, upsock = UpSock}) ->
+loop_proxy_relay(#proxy{insock = InSock, upsock = UpSock} = St) ->
     ok = ranch_tcp:setopts(InSock, ?PROXY_SOCKET_OPTS),
     ok = ranch_tcp:setopts(InSock, ?PROXY_SOCKET_OPTS),
     receive

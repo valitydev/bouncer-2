@@ -7,6 +7,8 @@
         kernel,
         stdlib,
         genlib,
+        prometheus,
+        prometheus_cowboy,
         woody,
         scoper,
         thrift,
@@ -16,7 +18,6 @@
         org_management_proto,
         erl_health,
         gunner,
-        how_are_you,
         opentelemetry_api,
         opentelemetry_exporter,
         opentelemetry

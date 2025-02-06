@@ -154,9 +154,11 @@ write_error_fails_request(C) ->
         C
     ),
     Client = mk_client(C1),
+    _ = meck:new(logger_std_h, [unstick, passthrough]),
+    _ = meck:expect(logger_std_h, write, fun(_Name, sync, _Bin, HandlerState) ->
+        {{error, enoent}, HandlerState}
+    end),
     try
-        ok = file:delete(Filename),
-        ok = file:del_dir(Dirname),
         ?assertError(
             % NOTE
             % The `_Reason` here may be either `result_unexpected` or `result_unknown`, depending
@@ -165,6 +167,7 @@ write_error_fails_request(C) ->
             call_judge(?API_RULESET_ID, ?CONTEXT(#{}), Client)
         )
     after
+        _ = meck:unload(logger_std_h),
         _ = rm_temp_dir(Dirname),
         stop_bouncer(C1)
     end.

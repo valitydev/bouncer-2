@@ -183,7 +183,7 @@ decode_fragment(v1_thrift_binary, Content) ->
 %%
 
 -spec append_pulse_metadata(bouncer_arbiter_pulse:metadata(), st()) -> st().
-append_pulse_metadata(Metadata, St = #st{pulse_metadata = MetadataWas}) ->
+append_pulse_metadata(Metadata, #st{pulse_metadata = MetadataWas} = St) ->
     St#st{pulse_metadata = maps:merge(MetadataWas, Metadata)}.
 
 -spec handle_judgement_beat(_Beat, st()) -> ok.

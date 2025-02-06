@@ -1,4 +1,5 @@
 -module(bouncer_gunner_metrics_event_h).
+%% NOTE Maybe move it to gunner lib
 
 -include_lib("gunner/include/gunner_events.hrl").
 
@@ -14,7 +15,8 @@
 
 -type timer_id() :: term().
 -type timer_start_ts() :: non_neg_integer().
--type metric_key() :: how_are_you:metric_key().
+%% -type metric_key() :: how_are_you:metric_key().
+-type metric_key() :: _.
 
 %%
 %% gunner_event_h behaviour
@@ -177,7 +179,7 @@ stop_timer(TimerKey, State) ->
     end.
 
 %%
-%% Hay utils
+%% Collector utils
 %%
 
 -spec counter_inc(metric_key()) -> ok.
@@ -198,9 +200,11 @@ create_duration(KeyPrefix, Duration) ->
     create_metric(counter, [KeyPrefix, BinKey], 1).
 
 -spec create_metric(atom(), metric_key(), integer()) -> ok.
-create_metric(Type, Key, Value) ->
-    Metric = how_are_you:metric_construct(Type, Key, Value),
-    how_are_you:metric_push(Metric).
+create_metric(_Type, _Key, _Value) ->
+    %% TODO Implement prometheus collector
+    %% Metric = how_are_you:metric_construct(Type, Key, Value),
+    %% how_are_you:metric_push(Metric).
+    ok.
 
 %%
 

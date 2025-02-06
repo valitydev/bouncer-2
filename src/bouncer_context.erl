@@ -45,7 +45,7 @@ merge(Ctx1, Ctx2) ->
         Ctx2
     ).
 
-merge_values(V1 = #{}, V2 = #{}) ->
+merge_values(#{} = V1, #{} = V2) ->
     merge(V1, V2);
 merge_values(V1, V2) ->
     case ordsets:is_set(V1) and ordsets:is_set(V2) of

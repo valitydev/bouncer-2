@@ -92,7 +92,7 @@ mk_logger_backend_config(BackendOpts) ->
         BackendConfig
     ).
 
-tune_backend_config(Opts = #{type := file}) ->
+tune_backend_config(#{type := file} = Opts) ->
     _ = maps:get(file, Opts),
     % NOTE
     % All those options chosen to push message loss probability as close to zero as possible.
@@ -164,11 +164,11 @@ terminate(Reason, State1) ->
 % Please take care to update it when upgrading to newer Erlang OTP releases.
 emit_log_sync(
     Bin,
-    State = #{
+    #{
         id := Name,
         module := Module,
         handler_state := HandlerState
-    }
+    } = State
 ) ->
     {Result, HS1} = Module:write(Name, sync, Bin, HandlerState),
     {Result, State#{
@@ -296,24 +296,24 @@ extract_opt_meta(K, Metadata, EncodeFun, Acc) ->
 encode_id(ID) when is_binary(ID) ->
     ID.
 
-encode_context(Context = #{}) ->
+encode_context(#{} = Context) ->
     % TODO
     % We'll probably need something like `bouncer_context:extract_metadata/1` here when the schema
     % stops being that simple.
     Context.
 
-encode_fragments(Fragments = #{}) ->
+encode_fragments(#{} = Fragments) ->
     maps:map(fun encode_fragment/2, Fragments).
 
 encode_fragment(_ID, Fragment) ->
     maps:with([type, metadata], Fragment).
 
-extract_woody_ctx(WoodyCtx = #{rpc_id := RpcID}, Acc) ->
+extract_woody_ctx(#{rpc_id := RpcID} = WoodyCtx, Acc) ->
     extract_woody_meta(WoodyCtx, extract_woody_rpc_id(RpcID, Acc));
 extract_woody_ctx(undefined, Acc) ->
     Acc.
 
-extract_woody_rpc_id(RpcID = #{span_id := _, trace_id := _, parent_id := _}, Acc) ->
+extract_woody_rpc_id(#{span_id := _, trace_id := _, parent_id := _} = RpcID, Acc) ->
     maps:merge(Acc, RpcID).
 
 %% TODO

@@ -35,7 +35,5 @@ handle_function('GetUserContext', {UserID}, _WoodyCtx, _Opts) ->
 
 encode_context_fragment(ContextFragment) ->
     Codec = thrift_strict_binary_codec:new(),
-    case thrift_strict_binary_codec:write(Codec, ?THRIFT_TYPE, ContextFragment) of
-        {ok, Codec1} ->
-            thrift_strict_binary_codec:close(Codec1)
-    end.
+    {ok, Codec1} = thrift_strict_binary_codec:write(Codec, ?THRIFT_TYPE, ContextFragment),
+    thrift_strict_binary_codec:close(Codec1).
